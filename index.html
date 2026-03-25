@@ -1284,6 +1284,7 @@ body {
 const K_BREWS    = 'bl_v10';
 const K_BEANS    = 'bl_beans_v3';
 const K_SETTINGS = 'bl_s4';
+const K_DRAFT    = 'bl_draft_v1';
 
 const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) || d; } catch { return d; } };
 const persist = (k, v) => localStorage.setItem(k, JSON.stringify(v));
@@ -1315,6 +1316,54 @@ let brewDOR      = null; // manual days off roast when frozen
 /* ──────────────────────────────────────────────────────────────
    Init
 ────────────────────────────────────────────────────────────── */
+/* ──────────────────────────────────────────────────────────────
+   Draft autosave — persists log form when app is closed/backgrounded
+────────────────────────────────────────────────────────────── */
+function saveDraft() {
+  try {
+    const draft = {
+      beanId: selBean, grinder: selGrinder, brewer: selBrewer, filter: selFilter,
+      date: logDate, editBrewId,
+      fields: {},
+      ss: { ...ss },
+      aroma: parseInt(document.getElementById('aromaSlider')?.value || 5),
+      cvRows: cvRows.map(r => ({ ...r })),
+      frozen: brewFrozen, dor: brewDOR,
+    };
+    ['lName','lDose','lWater','lTemp','lGrind','lBloom','lTime','lBev','lTDS','lScore','lNotes','lAdjust','aromaNotes','hotNotes','coolNotes']
+      .forEach(id => { const el = document.getElementById(id); if (el) draft.fields[id] = el.value; });
+    persist(K_DRAFT, draft);
+  } catch(e) {}
+}
+
+function restoreDraft() {
+  const d = load(K_DRAFT, null);
+  if (!d || !Object.keys(d.fields || {}).length) return;
+  selBean = d.beanId; selGrinder = d.grinder; selBrewer = d.brewer; selFilter = d.filter;
+  editBrewId = d.editBrewId || null;
+  if (d.date) setLogDate(d.date);
+  Object.entries(d.fields || {}).forEach(([id, val]) => { const el = document.getElementById(id); if (el) el.value = val; });
+  ss = d.ss || { hA:5, hS:5, hB:5, cA:5, cS:5, cB:5 };
+  buildSegControls();
+  if (d.aroma != null) { document.getElementById('aromaSlider').value = d.aroma; initSlider(); }
+  cvRows = (d.cvRows || []).map(r => ({ ...r }));
+  renderCV();
+  brewFrozen = !!d.frozen; brewDOR = d.dor || null;
+  if (brewFrozen && brewDOR != null) document.getElementById('dorInput').value = brewDOR;
+  updateDOR();
+  const bean = beans.find(b => b.id === selBean);
+  const bd = document.getElementById('beanDisplay');
+  if (bean && bd) { bd.textContent = bdn(bean); bd.style.color = 'var(--text)'; }
+  setDisp('grinderDisplay', selGrinder, 'Select');
+  setDisp('brewerDisplay',  selBrewer,  'Select');
+  setDisp('filterDisplay',  selFilter,  'Select');
+  recalcEY();
+  TAB_CFG.log.title = editBrewId ? 'Edit Brew' : 'New Brew';
+  document.getElementById('hTitle').textContent = TAB_CFG.log.title;
+}
+
+function clearDraft() { localStorage.removeItem(K_DRAFT); }
+
 document.addEventListener('DOMContentLoaded', () => {
   setLogDate(logDate);
   buildSegControls();
@@ -1323,6 +1372,15 @@ document.addEventListener('DOMContentLoaded', () => {
   renderBeans();
   renderDataset();
   renderStats();
+  restoreDraft();
+
+  /* autosave on every input/change in the log form */
+  document.getElementById('page-log').addEventListener('input',  saveDraft);
+  document.getElementById('page-log').addEventListener('change', saveDraft);
+
+  /* save draft when app is backgrounded / closed on iOS */
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') saveDraft(); });
+  window.addEventListener('pagehide', saveDraft);
 
   document.querySelectorAll('.overlay').forEach(o =>
     o.addEventListener('click', e => { if (e.target === o) closeSheet(o.id); })
@@ -1703,6 +1761,7 @@ function saveBrew() {
     brews.unshift(brew);
   }
   persist(K_BREWS, brews);
+  clearDraft();
   const wasNew = !editBrewId;
   editBrewId = brew.id;  // keep reference so next save updates this brew
   TAB_CFG.log.title = 'Edit Brew';
@@ -1735,6 +1794,7 @@ function resetLogForm() {
   setLogDate(today());
   TAB_CFG.log.title = 'New Brew';
   document.getElementById('hTitle').textContent = 'New Brew';
+  clearDraft();
 }
 
 /* ──────────────────────────────────────────────────────────────
