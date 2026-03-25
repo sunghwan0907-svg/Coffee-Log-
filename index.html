@@ -1,0 +1,3135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Brew Log">
+<link rel="manifest" href="manifest.json">
+<title>Brew Log</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+/* ── Palette ──────────────────────────────────────────────────── */
+:root {
+  --bg:       #f5f0eb;
+  --bg2:      #ffffff;
+  --bg3:      #eae4dd;
+  --text:     #1a1714;
+  --text2:    rgba(26,23,20,0.6);
+  --text3:    #9b918a;
+  --sep:      rgba(26,23,20,0.08);
+  --sep2:     rgba(26,23,20,0.04);
+  --accent:   #c8553a;
+  --blue:     #3d7ce0;
+  --red:      #c44040;
+  --green:    #4a9e6b;
+  --orange:   #d48b3b;
+  --purple:   #8b6aae;
+  --fill:     rgba(26,23,20,0.06);
+  --fill2:    rgba(26,23,20,0.03);
+  --shadow:   0 1px 4px rgba(26,23,20,0.06);
+  --shadow2:  0 4px 20px rgba(26,23,20,0.08);
+
+  --c-log:      #c8553a;
+  --c-bean:     #4a9e6b;
+  --c-dataset:  #3d7ce0;
+  --c-guide:    #d4813c;
+  --c-settings: #8b6aae;
+  --c-stats:    #4a9e6b;
+
+  --aroma: #8b6aae;
+  --hot:   #d48b3b;
+  --cool:  #3d7ce0;
+
+  --r:    16px;
+  --r-lg: 20px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg:    #121110;
+    --bg2:   #1e1c1a;
+    --bg3:   #2a2725;
+    --text:  #f0ece8;
+    --text2: rgba(240,236,232,0.65);
+    --text3: rgba(240,236,232,0.38);
+    --sep:   rgba(240,236,232,0.08);
+    --sep2:  rgba(240,236,232,0.04);
+    --fill:  rgba(240,236,232,0.07);
+    --fill2: rgba(240,236,232,0.04);
+    --shadow: 0 1px 4px rgba(0,0,0,0.3);
+    --shadow2: 0 4px 20px rgba(0,0,0,0.3);
+  }
+}
+
+/* ── Reset ────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; }
+button { cursor: pointer; border: none; background: none; font-family: inherit; }
+input, textarea { font-family: inherit; }
+input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
+* { -webkit-tap-highlight-color: transparent; }
+
+body {
+  font-family: -apple-system, 'SF Pro Text', 'SF Pro Display', BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 18px;
+  line-height: 1.47;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── App shell ────────────────────────────────────────────────── */
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-width: 430px;
+  margin: 0 auto;
+  position: relative;
+}
+
+/* ── Header ───────────────────────────────────────────────────── */
+.header {
+  background: var(--bg);
+  padding: 14px 20px 16px;
+  padding-top: calc(14px + env(safe-area-inset-top));
+  flex-shrink: 0;
+  position: relative;
+  z-index: 10;
+}
+.header-eye {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+  transition: color 0.25s;
+}
+.header-title {
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -0.8px;
+  line-height: 1.05;
+}
+
+/* ── Scroll area ──────────────────────────────────────────────── */
+.content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: calc(76px + env(safe-area-inset-bottom) + 16px);
+}
+
+/* ── Tab bar ──────────────────────────────────────────────────── */
+.tabbar {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 430px;
+  background: var(--bg2);
+  border-top: 1px solid var(--sep);
+  display: flex;
+  padding: 4px 8px;
+  padding-bottom: calc(4px + env(safe-area-inset-bottom));
+  z-index: 100;
+}
+.tab-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 7px 2px 4px;
+  gap: 3px;
+  border-radius: 12px;
+  transition: background 0.15s, opacity 0.1s;
+}
+.tab-btn:active { opacity: 0.6; }
+.tab-icon {
+  font-size: 20px;
+  line-height: 1;
+  filter: grayscale(1) opacity(0.35);
+  transition: filter 0.2s;
+}
+.tab-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text3);
+  letter-spacing: 0.02em;
+  transition: color 0.2s;
+}
+.tab-btn.active .tab-icon { filter: none; }
+.tab-btn.active { background: var(--fill); }
+.tab-btn[data-tab="log"].active      .tab-label { color: var(--c-log); }
+.tab-btn[data-tab="bean"].active     .tab-label { color: var(--c-bean); }
+.tab-btn[data-tab="dataset"].active  .tab-label { color: var(--c-dataset); }
+.tab-btn[data-tab="settings"].active .tab-label { color: var(--c-settings); }
+.tab-btn[data-tab="stats"].active    .tab-label { color: var(--c-stats); }
+
+/* ── Pages ────────────────────────────────────────────────────── */
+.tab-page { display: none; }
+.tab-page.active { display: block; }
+
+/* ── Section ──────────────────────────────────────────────────── */
+.section { margin: 16px 16px 0; }
+.section:first-child { margin-top: 8px; }
+.section:last-child  { margin-bottom: 4px; }
+.section-header {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text3);
+  margin-bottom: 8px;
+  padding: 0 6px;
+}
+.section-sub {
+  font-size: 13px;
+  color: var(--text3);
+  padding: 0 6px;
+  margin-bottom: 8px;
+  font-style: italic;
+}
+
+/* ── Grouped list ─────────────────────────────────────────────── */
+.group {
+  background: var(--bg2);
+  border-radius: var(--r);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+.row {
+  display: flex;
+  align-items: center;
+  padding: 13px 18px;
+  border-bottom: 1px solid var(--sep);
+  min-height: 48px;
+  gap: 10px;
+}
+.row:last-child { border-bottom: none; }
+.row-label {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text);
+  min-width: 100px;
+  flex-shrink: 0;
+}
+.row-input {
+  flex: 1;
+  border: none;
+  background: none;
+  font-size: 15px;
+  color: var(--text);
+  text-align: right;
+  outline: none;
+  min-width: 0;
+}
+.row-input::placeholder { color: var(--text3); }
+.row-value {
+  font-size: 15px;
+  color: var(--text3);
+  flex-shrink: 0;
+  font-weight: 500;
+}
+.row-chevron { color: var(--text3); font-size: 15px; flex-shrink: 0; opacity: 0.6; }
+.row-tappable { cursor: pointer; transition: background 0.1s; }
+.row-tappable:active { background: var(--fill); }
+
+/* ── Textarea row ─────────────────────────────────────────────── */
+.textarea-row {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  padding: 14px 18px;
+}
+.textarea-row .row-label {
+  min-width: unset;
+  font-size: 12px;
+  color: var(--text3);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.row-textarea {
+  border: none;
+  background: none;
+  font-size: 15px;
+  color: var(--text);
+  outline: none;
+  resize: none;
+  width: 100%;
+  min-height: 52px;
+  line-height: 1.55;
+}
+.row-textarea::placeholder { color: var(--text3); }
+
+/* ── EY ───────────────────────────────────────────────────────── */
+.ey-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  margin-left: auto;
+  margin-right: 4px;
+  letter-spacing: -0.3px;
+}
+
+/* ── Sensory card ─────────────────────────────────────────────── */
+.sensory-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--sep);
+}
+.sensory-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.sensory-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.aroma-card .sensory-dot  { background: var(--aroma); }
+.aroma-card .sensory-title { color: var(--aroma); }
+.hot-card   .sensory-dot  { background: var(--hot); }
+.hot-card   .sensory-title { color: var(--hot); }
+.cool-card  .sensory-dot  { background: var(--cool); }
+.cool-card  .sensory-title { color: var(--cool); }
+
+/* ── Intensity slider ─────────────────────────────────────────── */
+.intensity-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--sep);
+}
+.intensity-label { font-size: 14px; color: var(--text3); min-width: 60px; font-weight: 500; }
+.intensity-slider {
+  flex: 1;
+  -webkit-appearance: none;
+  height: 5px;
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+}
+.aroma-card .intensity-slider { background: linear-gradient(to right, var(--aroma) var(--pct,44%), var(--fill) var(--pct,44%)); }
+.hot-card   .intensity-slider { background: linear-gradient(to right, var(--hot)   var(--pct,44%), var(--fill) var(--pct,44%)); }
+.cool-card  .intensity-slider { background: linear-gradient(to right, var(--cool)  var(--pct,44%), var(--fill) var(--pct,44%)); }
+.intensity-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  background: var(--bg2);
+  box-shadow: 0 1px 6px rgba(0,0,0,0.2);
+}
+.intensity-value { font-size: 16px; font-weight: 700; min-width: 20px; text-align: right; }
+
+/* ── Seg control ──────────────────────────────────────────────── */
+.seg-row {
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--sep);
+}
+.seg-row:last-of-type { border-bottom: none; }
+.seg-label {
+  font-size: 12px;
+  color: var(--text3);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 8px;
+}
+.seg-ctrl {
+  display: flex;
+  background: var(--fill);
+  border-radius: 10px;
+  padding: 3px;
+  gap: 2px;
+}
+.seg-btn {
+  flex: 1;
+  padding: 7px 0;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text3);
+  transition: all 0.15s;
+  line-height: 1;
+}
+.seg-btn.active {
+  background: var(--bg2);
+  color: var(--text);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+}
+
+/* ── Score ────────────────────────────────────────────────────── */
+.score-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 12px 18px;
+}
+.score-row .row-label { min-width: 80px; }
+.score-input {
+  flex: 1;
+  border: none;
+  background: none;
+  font-size: 32px;
+  font-weight: 800;
+  color: var(--text);
+  text-align: right;
+  outline: none;
+  letter-spacing: -1px;
+}
+.score-input::placeholder { font-size: 16px; font-weight: 400; color: var(--text3); }
+.score-unit { font-size: 15px; color: var(--text3); font-weight: 500; }
+
+/* ── Custom vars ──────────────────────────────────────────────── */
+.cv-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 18px;
+  border-bottom: 1px solid var(--sep);
+}
+.cv-key, .cv-val {
+  flex: 1;
+  border: none;
+  background: var(--fill);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 15px;
+  color: var(--text);
+  outline: none;
+  min-width: 0;
+}
+.cv-key::placeholder, .cv-val::placeholder { color: var(--text3); }
+.cv-del { color: var(--red); font-size: 20px; line-height: 1; flex-shrink: 0; padding: 2px; }
+.add-cv-btn { color: var(--accent); font-size: 15px; font-weight: 600; padding: 12px 18px; display: block; text-align: left; width: 100%; }
+
+/* ── Primary button ───────────────────────────────────────────── */
+.btn-primary {
+  display: block;
+  width: calc(100% - 32px);
+  margin: 24px 16px;
+  padding: 16px;
+  background: var(--accent);
+  color: #fff;
+  border-radius: var(--r);
+  font-size: 16px;
+  font-weight: 700;
+  text-align: center;
+  letter-spacing: 0.02em;
+  transition: opacity 0.1s, transform 0.1s;
+}
+.btn-primary:active { opacity: 0.85; transform: scale(0.99); }
+
+/* ── FAB ──────────────────────────────────────────────────────── */
+#fab {
+  position: fixed;
+  bottom: calc(72px + env(safe-area-inset-bottom) + 14px);
+  right: calc(18px + max(0px, (100vw - 430px) / 2));
+  width: 54px; height: 54px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 28px;
+  font-weight: 300;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 16px rgba(200,85,58,0.35);
+  z-index: 50;
+  line-height: 1;
+  transition: transform 0.12s;
+}
+#fab:active { transform: scale(0.92); }
+
+/* ── Bottom sheets ────────────────────────────────────────────── */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(18,16,14,0.5);
+  z-index: 200;
+  display: none;
+  align-items: flex-end;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.overlay.open { display: flex; }
+.sheet {
+  width: 100%;
+  max-width: 430px;
+  background: var(--bg2);
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  animation: sheetUp 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+@keyframes sheetUp {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+.sheet-handle {
+  width: 36px; height: 5px;
+  background: var(--fill);
+  border-radius: 3px;
+  margin: 10px auto 6px;
+  flex-shrink: 0;
+}
+.sheet-title {
+  font-size: 17px;
+  font-weight: 700;
+  text-align: center;
+  padding: 4px 18px 14px;
+  border-bottom: 1px solid var(--sep);
+  flex-shrink: 0;
+}
+.sheet-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+
+/* ── Sheet search ─────────────────────────────────────────────── */
+.sheet-search { padding: 10px 16px; border-bottom: 1px solid var(--sep); flex-shrink: 0; }
+.sheet-search-input {
+  width: 100%;
+  background: var(--fill);
+  border: none;
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-size: 15px;
+  color: var(--text);
+  outline: none;
+}
+.sheet-search-input::placeholder { color: var(--text3); }
+
+/* ── Filter chips ─────────────────────────────────────────────── */
+.chips {
+  display: flex;
+  gap: 8px;
+  padding: 10px 16px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--sep);
+}
+.chips::-webkit-scrollbar { display: none; }
+.chip {
+  padding: 6px 14px;
+  border-radius: var(--r);
+  font-size: 14px;
+  font-weight: 600;
+  background: var(--fill);
+  color: var(--text2);
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+.chip.on { background: var(--accent); color: #fff; }
+
+/* ── Picker list row ──────────────────────────────────────────── */
+.pick-row {
+  display: flex;
+  align-items: center;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--sep);
+  gap: 12px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.pick-row:active { background: var(--fill); }
+.pick-row:last-child { border-bottom: none; }
+.pick-main { flex: 1; font-size: 15px; font-weight: 500; }
+.pick-sub { font-size: 14px; color: var(--text3); margin-top: 2px; }
+.pick-check { color: var(--accent); font-size: 18px; opacity: 0; flex-shrink: 0; }
+.pick-row.selected .pick-check { opacity: 1; }
+
+/* ── Bean cards ───────────────────────────────────────────────── */
+.bean-card {
+  background: var(--bg2);
+  border-radius: var(--r);
+  padding: 16px 18px;
+  margin-bottom: 12px;
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  transition: transform 0.1s, opacity 0.1s;
+}
+.bean-card:active { transform: scale(0.985); opacity: 0.85; }
+.bean-name { font-size: 16px; font-weight: 700; margin-bottom: 8px; line-height: 1.3; }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag {
+  padding: 4px 10px;
+  border-radius: var(--r);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.tag-r { background: rgba(200,85,58,.1);   color: var(--accent); }
+.tag-f { background: rgba(212,139,59,.1);  color: var(--orange); }
+.tag-p { background: rgba(74,158,107,.1);  color: var(--green); }
+.tag-v { background: rgba(61,124,224,.1);  color: var(--blue); }
+.tag-o { background: rgba(155,145,138,.1); color: var(--text3); }
+@media (prefers-color-scheme: dark) {
+  .tag-r { background: rgba(200,85,58,.18); }
+  .tag-f { background: rgba(212,139,59,.18); }
+  .tag-p { background: rgba(74,158,107,.18); }
+  .tag-v { background: rgba(61,124,224,.18); }
+  .tag-o { background: rgba(155,145,138,.15); }
+}
+
+/* ── Dataset cards ────────────────────────────────────────────── */
+.brew-wrap {
+  position: relative;
+  border-radius: var(--r);
+  overflow: hidden;
+  margin-bottom: 12px;
+  box-shadow: var(--shadow);
+}
+.brew-del-bg {
+  position: absolute;
+  right: 0; top: 0; bottom: 0;
+  width: 80px;
+  background: var(--red);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+.brew-card {
+  background: var(--bg2);
+  border-radius: var(--r);
+  padding: 16px 18px;
+  cursor: pointer;
+  position: relative;
+  transform: translateX(0);
+  transition: transform 0.22s cubic-bezier(0.25,0.46,0.45,0.94);
+  will-change: transform;
+}
+.brew-bean { font-size: 16px; font-weight: 700; margin-bottom: 3px; line-height: 1.3; }
+.brew-sub { font-size: 14px; color: var(--text3); margin-bottom: 12px; font-weight: 500; }
+.brew-stats { display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-end; }
+.brew-stat { display: flex; flex-direction: column; gap: 3px; }
+.brew-stat-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text3); }
+.brew-stat-val { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; }
+.brew-score-badge {
+  margin-left: auto;
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  color: var(--accent);
+}
+
+/* expanded */
+.brew-expand { display: none; border-top: 1px solid var(--sep); margin-top: 14px; padding-top: 14px; }
+.brew-card.open .brew-expand { display: block; }
+.mini-row { display: flex; gap: 8px; margin-bottom: 12px; }
+.mini-card {
+  flex: 1;
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+.mini-a { background: rgba(139,106,174,.1); }
+.mini-h { background: rgba(212,139,59,.1); }
+.mini-c { background: rgba(61,124,224,.1); }
+.mini-label { font-size: 9px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 4px; }
+.mini-a .mini-label { color: var(--aroma); }
+.mini-h .mini-label { color: var(--hot); }
+.mini-c .mini-label { color: var(--cool); }
+.mini-val { font-size: 20px; font-weight: 800; }
+.mini-notes { font-size: 12px; color: var(--text3); margin-top: 3px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.brew-notes-snip { font-size: 14px; color: var(--text3); margin-bottom: 10px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
+.brew-ey-line { font-size: 14px; color: var(--text3); margin-bottom: 12px; }
+.edit-brew-btn { background: var(--fill); border-radius: 10px; padding: 9px 18px; font-size: 15px; font-weight: 600; color: var(--blue); transition: background 0.1s; }
+.edit-brew-btn:active { background: var(--sep); }
+.clone-brew-btn { background: var(--fill); border-radius: 10px; padding: 9px 18px; font-size: 15px; font-weight: 600; color: var(--green); margin-left: 8px; transition: background 0.1s; }
+.clone-brew-btn:active { background: var(--sep); }
+
+/* Dataset search */
+.ds-search-wrap { padding: 0 16px 8px; }
+.ds-search { width: 100%; padding: 12px 16px; border-radius: var(--r); border: 1px solid var(--sep); background: var(--card); font-size: 15px; color: var(--fg); outline: none; transition: border-color .2s; box-sizing: border-box; }
+.ds-search:focus { border-color: var(--accent); }
+.ds-search::placeholder { color: var(--dim); }
+
+/* Flavour / Texture wheel */
+.wheel-container { padding: 12px !important; }
+.wheel-breadcrumb { display: flex; align-items: center; gap: 4px; padding: 0 4px 10px; flex-wrap: wrap; }
+.wheel-crumb { font-size: 14px; font-weight: 600; color: var(--dim); cursor: pointer; }
+.wheel-crumb:last-child { color: var(--fg); cursor: default; }
+.wheel-crumb-sep { font-size: 12px; color: var(--dim); }
+.wheel-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px; }
+.wheel-chip { display: flex; align-items: center; justify-content: center; text-align: center; padding: 12px 6px; border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; transition: transform .12s, box-shadow .12s; line-height: 1.3; min-height: 44px; position: relative; }
+.wheel-chip:active { transform: scale(.95); }
+.wheel-info-btn { position: absolute; top: 4px; right: 6px; width: 18px; height: 18px; border-radius: 50%; background: rgba(0,0,0,.12); color: #fff; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; cursor: pointer; line-height: 1; }
+.wheel-info-btn:hover { background: rgba(0,0,0,.25); }
+.wheel-info { margin-top: 12px; padding: 14px 16px; border-radius: 12px; background: var(--fill); font-size: 15px; line-height: 1.6; color: var(--fg); }
+.wheel-info strong { font-weight: 700; }
+@media(prefers-color-scheme:dark) {
+  .wheel-info-btn { background: rgba(255,255,255,.18); }
+}
+.brew-actions { display: flex; }
+.bean-age { font-size: 13px; font-weight: 600; color: var(--text3); margin-top: 6px; }
+.bean-age-frozen { color: var(--cool); }
+.brew-age-tag { font-size: 12px; font-weight: 700; color: var(--text3); margin-left: 6px; }
+.brew-age-tag.frozen { color: var(--cool); }
+
+/* Context menu */
+.ctx-menu {
+  position: fixed;
+  z-index: 300;
+  background: var(--bg2);
+  border-radius: 14px;
+  box-shadow: var(--shadow2), 0 0 0 1px var(--sep);
+  min-width: 170px;
+  overflow: hidden;
+  animation: ctxIn 0.12s ease;
+  display: none;
+}
+.ctx-menu.open { display: block; }
+@keyframes ctxIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+.ctx-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 18px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+  border-bottom: 1px solid var(--sep);
+  width: 100%;
+  text-align: left;
+  transition: background 0.1s;
+}
+.ctx-item:last-child { border-bottom: none; }
+.ctx-item:active { background: var(--fill); }
+.ctx-item.destructive { color: var(--red); }
+
+/* Days off roast */
+.dor-value { font-size: 16px; font-weight: 700; color: var(--text); margin-left: auto; margin-right: 8px; }
+.dor-input { max-width: 60px; font-weight: 700; margin-right: 8px; }
+.frozen-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  border-radius: var(--r);
+  background: var(--fill);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text3);
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+.frozen-toggle.on {
+  background: rgba(61,124,224,0.12);
+  color: var(--cool);
+}
+.frozen-icon { font-size: 14px; }
+.frozen-label { font-size: 13px; }
+
+/* ── Settings ─────────────────────────────────────────────────── */
+.s-section { background: var(--bg2); border-radius: var(--r); overflow: hidden; box-shadow: var(--shadow); }
+.s-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.s-header:active { background: var(--fill); }
+.s-title { font-size: 16px; font-weight: 700; }
+.s-chev { color: var(--text3); font-size: 16px; transition: transform 0.2s; display: inline-block; }
+.s-section.open .s-chev { transform: rotate(180deg); }
+.s-body { display: none; border-top: 1px solid var(--sep); }
+.s-section.open .s-body { display: block; }
+.s-item {
+  display: flex;
+  align-items: center;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--sep);
+  gap: 10px;
+}
+.s-item:last-child { border-bottom: none; }
+.s-item-name { flex: 1; font-size: 15px; font-weight: 500; }
+.s-del { color: var(--red); font-size: 20px; line-height: 1; }
+.s-add-row { display: flex; gap: 10px; padding: 12px 18px; border-top: 1px solid var(--sep); }
+.s-add-input {
+  flex: 1;
+  background: var(--fill);
+  border: none;
+  border-radius: 10px;
+  padding: 9px 14px;
+  font-size: 15px;
+  color: var(--text);
+  outline: none;
+  min-width: 0;
+}
+.s-add-input::placeholder { color: var(--text3); }
+.s-add-btn { background: var(--accent); color: #fff; border-radius: 10px; padding: 9px 16px; font-size: 15px; font-weight: 700; flex-shrink: 0; }
+
+/* ── Export ───────────────────────────────────────────────────── */
+.export-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: calc(100% - 32px);
+  margin: 24px 16px;
+  padding: 15px;
+  background: var(--fill);
+  border-radius: var(--r);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--accent);
+  transition: background 0.1s;
+}
+.export-btn:active { background: var(--sep); }
+
+/* ── Stats ────────────────────────────────────────────────────── */
+.stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.stat-card { background: var(--bg2); border-radius: var(--r); padding: 18px; box-shadow: var(--shadow); }
+.stat-val { font-size: 32px; font-weight: 800; letter-spacing: -1px; line-height: 1; margin-bottom: 4px; }
+.stat-label { font-size: 13px; color: var(--text3); font-weight: 600; }
+.bar-row { margin-bottom: 14px; }
+.bar-row:last-child { margin-bottom: 0; }
+.bar-hdr { display: flex; justify-content: space-between; margin-bottom: 6px; }
+.bar-name { font-size: 14px; font-weight: 600; }
+.bar-num { font-size: 14px; color: var(--text3); font-weight: 500; }
+.bar-track { height: 5px; background: var(--fill); border-radius: 3px; overflow: hidden; }
+.bar-fill { height: 100%; border-radius: 3px; transition: width 0.6s cubic-bezier(0.22,1,0.36,1); }
+.bar-aroma    { background: var(--aroma); }
+.bar-acidity  { background: var(--orange); }
+.bar-sweet    { background: var(--green); }
+.bar-bitter   { background: var(--red); }
+.bar-cool     { background: var(--cool); }
+
+.recent-row {
+  display: flex;
+  align-items: center;
+  padding: 13px 18px;
+  border-bottom: 1px solid var(--sep);
+  gap: 14px;
+}
+.recent-row:last-child { border-bottom: none; }
+.recent-info { flex: 1; min-width: 0; }
+.recent-name { font-size: 15px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recent-meta { font-size: 13px; color: var(--text3); margin-top: 3px; font-weight: 500; }
+.recent-score { font-size: 24px; font-weight: 800; flex-shrink: 0; color: var(--accent); }
+
+/* ── Confirm sheet ────────────────────────────────────────────── */
+.confirm-body { padding: 24px 18px 10px; text-align: center; }
+.confirm-body h3 { font-size: 18px; font-weight: 800; margin-bottom: 8px; }
+.confirm-body p { font-size: 15px; color: var(--text3); margin-bottom: 24px; }
+.confirm-stack { display: flex; flex-direction: column; gap: 10px; }
+.btn-destructive { padding: 15px; background: var(--red); color: #fff; border-radius: var(--r); font-size: 16px; font-weight: 700; }
+.btn-cancel { padding: 15px; background: var(--fill); color: var(--text); border-radius: var(--r); font-size: 16px; font-weight: 600; }
+
+/* ── Empty states ─────────────────────────────────────────────── */
+.empty { text-align: center; padding: 64px 24px; }
+.empty-icon { font-size: 44px; margin-bottom: 14px; }
+.empty-title { font-size: 18px; font-weight: 700; margin-bottom: 6px; }
+.empty-sub { font-size: 15px; color: var(--text3); font-weight: 500; }
+
+/* ── Toast ────────────────────────────────────────────────────── */
+#toast {
+  position: fixed;
+  bottom: calc(76px + env(safe-area-inset-bottom) + 14px);
+  left: 50%;
+  transform: translateX(-50%) translateY(8px);
+  background: var(--text);
+  color: var(--bg);
+  padding: 10px 20px;
+  border-radius: var(--r-lg);
+  font-size: 15px;
+  font-weight: 600;
+  z-index: 999;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s, transform 0.2s;
+  white-space: nowrap;
+  letter-spacing: 0.01em;
+}
+#toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-eye" id="hEye" style="color:var(--c-log)">Coffee Log</div>
+    <div class="header-title" id="hTitle">New Brew</div>
+  </div>
+
+  <!-- Content -->
+  <div class="content" id="content">
+
+    <!-- ══ LOG ══════════════════════════════════════════════════ -->
+    <div class="tab-page active" id="page-log">
+
+      <div class="section">
+        <div class="group">
+          <div class="row row-tappable" onclick="openBeanPicker()">
+            <span class="row-label">Coffee</span>
+            <span class="row-value" id="beanDisplay" style="color:var(--text3)">Select bean</span>
+            <span class="row-chevron">›</span>
+          </div>
+          <div class="row">
+            <span class="row-label">Session</span>
+            <input class="row-input" id="lName" type="text" placeholder="e.g. Morning trial 1">
+          </div>
+          <div class="row row-tappable" onclick="openDateSheet()">
+            <span class="row-label">Date</span>
+            <span class="row-value" id="dateDisplay"></span>
+            <span class="row-chevron">›</span>
+          </div>
+          <div class="row" id="dorRow" style="display:none">
+            <span class="row-label">Days off roast</span>
+            <span class="dor-value" id="dorValue">—</span>
+            <input class="row-input dor-input" id="dorInput" type="number" placeholder="0" inputmode="numeric" min="0" style="display:none" oninput="onDorManual()">
+            <button class="frozen-toggle" id="frozenBtn" onclick="toggleFrozen()">
+              <span class="frozen-icon" id="frozenIcon">❄</span>
+              <span class="frozen-label" id="frozenLabel">No</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header">Equipment</div>
+        <div class="group">
+          <div class="row row-tappable" onclick="openEquip('grinder')">
+            <span class="row-label">Grinder</span>
+            <span class="row-value" id="grinderDisplay">Select</span>
+            <span class="row-chevron">›</span>
+          </div>
+          <div class="row row-tappable" onclick="openEquip('brewer')">
+            <span class="row-label">Brewer</span>
+            <span class="row-value" id="brewerDisplay">Select</span>
+            <span class="row-chevron">›</span>
+          </div>
+          <div class="row row-tappable" onclick="openEquip('filter')">
+            <span class="row-label">Filter</span>
+            <span class="row-value" id="filterDisplay">Select</span>
+            <span class="row-chevron">›</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header">Recipe</div>
+        <div class="group">
+          <div class="row">
+            <span class="row-label">Dose</span>
+            <input class="row-input" id="lDose" type="number" placeholder="0.0" step="0.1" inputmode="decimal" oninput="recalcEY()">
+            <span class="row-value">g</span>
+          </div>
+          <div class="row">
+            <span class="row-label">Water</span>
+            <input class="row-input" id="lWater" type="number" placeholder="0" step="1" inputmode="decimal">
+            <span class="row-value">ml</span>
+          </div>
+          <div class="row">
+            <span class="row-label">Temp</span>
+            <input class="row-input" id="lTemp" type="number" placeholder="93" step="0.5" inputmode="decimal">
+            <span class="row-value">°C</span>
+          </div>
+          <div class="row">
+            <span class="row-label">Grind</span>
+            <input class="row-input" id="lGrind" type="text" placeholder="e.g. 30 clicks">
+          </div>
+          <div class="row">
+            <span class="row-label">Bloom</span>
+            <input class="row-input" id="lBloom" type="number" placeholder="0" step="5" inputmode="decimal">
+            <span class="row-value">s</span>
+          </div>
+          <div class="row">
+            <span class="row-label">Total time</span>
+            <input class="row-input" id="lTime" type="text" placeholder="3:00">
+          </div>
+        </div>
+      </div>
+
+      <!-- Notes (after recipe, before extraction) -->
+      <div class="section">
+        <div class="section-header">Notes</div>
+        <div class="group">
+          <div class="row textarea-row">
+            <span class="row-label">Recipe &amp; thoughts</span>
+            <textarea class="row-textarea" id="lNotes" placeholder="Technique, water recipe, observations…" rows="3"></textarea>
+          </div>
+          <div class="row textarea-row" style="border-bottom:none">
+            <span class="row-label">Adjust next</span>
+            <textarea class="row-textarea" id="lAdjust" placeholder="What to change next time…" rows="2"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header">Extraction</div>
+        <div class="group">
+          <div class="row">
+            <span class="row-label">Bev weight</span>
+            <input class="row-input" id="lBev" type="number" placeholder="0.0" step="0.1" inputmode="decimal" oninput="recalcEY()">
+            <span class="row-value">g</span>
+          </div>
+          <div class="row">
+            <span class="row-label">TDS</span>
+            <input class="row-input" id="lTDS" type="number" placeholder="0.00" step="0.01" inputmode="decimal" oninput="recalcEY()">
+            <span class="row-value">%</span>
+          </div>
+          <div class="row">
+            <span class="row-label">EY</span>
+            <span class="ey-value" id="eyVal">—</span>
+            <span class="row-value">%</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Aroma -->
+      <div class="section">
+        <div class="section-header">Aroma</div>
+        <div class="group aroma-card">
+          <div class="sensory-header">
+            <div class="sensory-dot"></div>
+            <div class="sensory-title">Aroma</div>
+          </div>
+          <div class="intensity-row">
+            <span class="intensity-label">Intensity</span>
+            <input class="intensity-slider" type="range" min="1" max="9" value="5" id="aromaSlider" oninput="onSlider(this,'aroma')">
+            <span class="intensity-value" id="aromaVal">5</span>
+          </div>
+          <div class="row textarea-row" style="border-bottom:none">
+            <span class="row-label">Notes</span>
+            <textarea class="row-textarea" id="aromaNotes" placeholder="Describe the aroma…" rows="2"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- Hot -->
+      <div class="section">
+        <div class="section-header">Hot Flavour</div>
+        <div class="group hot-card">
+          <div class="sensory-header">
+            <div class="sensory-dot"></div>
+            <div class="sensory-title">Hot</div>
+          </div>
+          <div class="seg-row"><div class="seg-label">Acidity</div><div class="seg-ctrl" id="hAcid"></div></div>
+          <div class="seg-row"><div class="seg-label">Sweetness</div><div class="seg-ctrl" id="hSweet"></div></div>
+          <div class="seg-row"><div class="seg-label">Bitterness</div><div class="seg-ctrl" id="hBitter"></div></div>
+          <div class="row textarea-row" style="border-bottom:none">
+            <span class="row-label">Notes</span>
+            <textarea class="row-textarea" id="hotNotes" placeholder="Describe hot cup flavours…" rows="2"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cool -->
+      <div class="section">
+        <div class="section-header">Cool Flavour</div>
+        <div class="group cool-card">
+          <div class="sensory-header">
+            <div class="sensory-dot"></div>
+            <div class="sensory-title">Cool</div>
+          </div>
+          <div class="seg-row"><div class="seg-label">Acidity</div><div class="seg-ctrl" id="cAcid"></div></div>
+          <div class="seg-row"><div class="seg-label">Sweetness</div><div class="seg-ctrl" id="cSweet"></div></div>
+          <div class="seg-row"><div class="seg-label">Bitterness</div><div class="seg-ctrl" id="cBitter"></div></div>
+          <div class="row textarea-row" style="border-bottom:none">
+            <span class="row-label">Notes</span>
+            <textarea class="row-textarea" id="coolNotes" placeholder="Describe cool cup flavours…" rows="2"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- Custom vars -->
+      <div class="section">
+        <div class="section-header">Custom Variables</div>
+        <div class="group">
+          <div id="cvList"></div>
+          <button class="add-cv-btn" onclick="addCV()">+ Add variable</button>
+        </div>
+      </div>
+
+      <!-- Score -->
+      <div class="section">
+        <div class="group">
+          <div class="score-row">
+            <span class="row-label">Score</span>
+            <input class="score-input" id="lScore" type="number" placeholder="—" step="0.25" min="0" max="10" inputmode="decimal">
+            <span class="score-unit">/ 10</span>
+          </div>
+        </div>
+      </div>
+
+      <button class="btn-primary" onclick="saveBrew()">Save Brew</button>
+    </div>
+
+    <!-- ══ BEAN ══════════════════════════════════════════════════ -->
+    <div class="tab-page" id="page-bean">
+      <div class="section" id="beanListSection"></div>
+    </div>
+
+    <!-- ══ DATASET ══════════════════════════════════════════════ -->
+    <div class="tab-page" id="page-dataset">
+      <div class="ds-search-wrap">
+        <input type="text" id="dsSearch" class="ds-search" placeholder="Search beans, roasters…" oninput="renderDataset()">
+      </div>
+      <div class="section" id="datasetSection"></div>
+    </div>
+
+    <!-- ══ SETTINGS ═════════════════════════════════════════════ -->
+    <div class="tab-page" id="page-settings">
+      <div class="section">
+        <div class="s-section" id="ss-grinder">
+          <div class="s-header" onclick="toggleSection('grinder')">
+            <span class="s-title">Grinders</span><span class="s-chev">⌄</span>
+          </div>
+          <div class="s-body">
+            <div id="sl-grinder"></div>
+            <div class="s-add-row">
+              <input class="s-add-input" id="si-grinder" type="text" placeholder="Add grinder…">
+              <button class="s-add-btn" onclick="addEquipItem('grinder')">Add</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="section">
+        <div class="s-section" id="ss-brewer">
+          <div class="s-header" onclick="toggleSection('brewer')">
+            <span class="s-title">Brewers</span><span class="s-chev">⌄</span>
+          </div>
+          <div class="s-body">
+            <div id="sl-brewer"></div>
+            <div class="s-add-row">
+              <input class="s-add-input" id="si-brewer" type="text" placeholder="Add brewer…">
+              <button class="s-add-btn" onclick="addEquipItem('brewer')">Add</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="section">
+        <div class="s-section" id="ss-filter">
+          <div class="s-header" onclick="toggleSection('filter')">
+            <span class="s-title">Filters</span><span class="s-chev">⌄</span>
+          </div>
+          <div class="s-body">
+            <div id="sl-filter"></div>
+            <div class="s-add-row">
+              <input class="s-add-input" id="si-filter" type="text" placeholder="Add filter…">
+              <button class="s-add-btn" onclick="addEquipItem('filter')">Add</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <button class="export-btn" onclick="exportXLSX()">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1v9M8 10l-3-3M8 10l3-3M2 13h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Export to Excel
+      </button>
+    </div>
+
+    <!-- ══ STATS ═════════════════════════════════════════════════ -->
+    <div class="tab-page" id="page-stats">
+      <div class="section">
+        <div class="stats-grid">
+          <div class="stat-card"><div class="stat-val" id="stBrews">0</div><div class="stat-label">Total Brews</div></div>
+          <div class="stat-card"><div class="stat-val" id="stScore">—</div><div class="stat-label">Avg Score</div></div>
+          <div class="stat-card"><div class="stat-val" id="stBeans">0</div><div class="stat-label">Beans</div></div>
+          <div class="stat-card"><div class="stat-val" id="stEY">—</div><div class="stat-label">Avg EY</div></div>
+        </div>
+      </div>
+      <div class="section">
+        <div class="section-header">Sensory Profile</div>
+        <div class="group" style="padding:14px 16px"><div id="sensoryBars"></div></div>
+      </div>
+      <div class="section" style="margin-bottom:8px">
+        <div class="section-header">Recent Brews</div>
+        <div class="group" id="recentBrews"></div>
+      </div>
+    </div>
+
+    <!-- ══ TASTING GUIDE ═════════════════════════════════════════ -->
+    <div class="tab-page" id="page-guide">
+      <div class="section">
+        <input type="text" id="guideSearch" class="ds-search" placeholder="Describe a flavor… e.g. fruity, tart, floral" oninput="guideSearch()">
+        <div id="guideSearchResults" style="display:none;margin-top:12px;padding:0 16px"></div>
+      </div>
+      <div class="section">
+        <div class="section-header">Tasting Notes</div>
+        <div class="group wheel-container" id="flavourWheel"></div>
+      </div>
+      <div class="section">
+        <div class="section-header">Acidity Guide</div>
+        <div class="group wheel-container" id="acidityWheel"></div>
+      </div>
+      <div class="section" style="margin-bottom:8px">
+        <div class="section-header">Sweetness Guide</div>
+        <div class="group wheel-container" id="sweetnessWheel"></div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+
+  <!-- Tab bar -->
+  <div class="tabbar">
+    <button class="tab-btn active" data-tab="log"      onclick="goTab('log')">      <span class="tab-icon">☕</span><span class="tab-label">Log</span></button>
+    <button class="tab-btn"        data-tab="bean"     onclick="goTab('bean')">     <span class="tab-icon">🌱</span><span class="tab-label">Bean</span></button>
+    <button class="tab-btn"        data-tab="dataset"  onclick="goTab('dataset')">  <span class="tab-icon">📋</span><span class="tab-label">Dataset</span></button>
+    <button class="tab-btn"        data-tab="guide"    onclick="goTab('guide')">    <span class="tab-icon">👅</span><span class="tab-label">Tasting</span></button>
+    <button class="tab-btn"        data-tab="settings" onclick="goTab('settings')"> <span class="tab-icon">⚙️</span><span class="tab-label">Settings</span></button>
+    <button class="tab-btn"        data-tab="stats"    onclick="goTab('stats')">    <span class="tab-icon">📊</span><span class="tab-label">Stats</span></button>
+  </div>
+
+  <button id="fab" onclick="onFab()">+</button>
+</div>
+
+<!-- ═══ SHEETS ══════════════════════════════════════════════════ -->
+
+<!-- Bean picker -->
+<div class="overlay" id="sBeanPick">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">Select Coffee</div>
+    <div class="sheet-search"><input class="sheet-search-input" id="bpSearch" type="search" placeholder="Search…" oninput="renderBPList()"></div>
+    <div id="bpChips"></div>
+    <div class="sheet-scroll" id="bpList"></div>
+  </div>
+</div>
+
+<!-- Equipment picker -->
+<div class="overlay" id="sEquip">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title" id="equipTitle">Select</div>
+    <div class="sheet-scroll" id="equipList"></div>
+  </div>
+</div>
+
+<!-- Date picker -->
+<div class="overlay" id="sDate">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">Date</div>
+    <div class="sheet-scroll" style="padding:16px">
+      <input type="date" id="dateInput" style="width:100%;padding:12px;border-radius:10px;border:none;background:var(--fill);font-size:16px;font-family:inherit;color:var(--text);outline:none">
+      <button class="btn-primary" style="margin:16px 0 0" onclick="confirmDate()">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add / Edit Bean -->
+<div class="overlay" id="sAddBean">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title" id="addBeanTitle">Add Bean</div>
+    <div class="sheet-scroll" style="padding-bottom:env(safe-area-inset-bottom)">
+      <div class="group" style="margin:16px;border-radius:12px;overflow:hidden">
+        <div class="row"><span class="row-label">Roaster</span><input class="row-input" id="bRoaster" type="text" placeholder="Required"></div>
+        <div class="row"><span class="row-label">Region</span><input class="row-input" id="bFarm" type="text" placeholder="e.g. Ethiopia"></div>
+        <div class="row"><span class="row-label">Processing</span><input class="row-input" id="bProc" type="text" placeholder="e.g. Washed"></div>
+        <div class="row"><span class="row-label">Varietal</span><input class="row-input" id="bVarietal" type="text" placeholder="e.g. Gesha"></div>
+        <div class="row"><span class="row-label">Other</span><input class="row-input" id="bOther" type="text" placeholder="Altitude, notes…"></div>
+        <div class="row"><span class="row-label">Roast date</span><input class="row-input" id="bRoastDate" type="date" style="text-align:right"></div>
+        <div class="row" style="border-bottom:none"><span class="row-label">Frozen at day</span><input class="row-input" id="bFrozenDay" type="number" placeholder="e.g. 14" inputmode="numeric" min="0"></div>
+      </div>
+      <button class="btn-primary" style="margin:0 16px 16px" id="saveBeanBtn" onclick="saveBean()">Add Bean</button>
+      <button class="btn-destructive" style="margin:0 16px 16px;display:none;width:calc(100% - 32px)" id="delBeanBtn" onclick="askDeleteBean()">Delete Bean</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm delete -->
+<div class="overlay" id="sConfDel">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="confirm-body">
+      <h3 id="confDelTitle">Delete Brew?</h3>
+      <p>This cannot be undone.</p>
+      <div class="confirm-stack">
+        <button class="btn-destructive" onclick="confirmDelete()">Delete</button>
+        <button class="btn-cancel" onclick="closeSheet('sConfDel')">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Context menu -->
+<div class="ctx-menu" id="ctxMenu">
+  <button class="ctx-item" id="ctxEdit" onclick="ctxAction('edit')">Edit</button>
+  <button class="ctx-item" id="ctxClone" onclick="ctxAction('clone')">Duplicate</button>
+  <button class="ctx-item destructive" id="ctxDel" onclick="ctxAction('delete')">Delete</button>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script>
+/* ──────────────────────────────────────────────────────────────
+   Data layer
+────────────────────────────────────────────────────────────── */
+const K_BREWS    = 'bl_v10';
+const K_BEANS    = 'bl_beans_v3';
+const K_SETTINGS = 'bl_s4';
+
+const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) || d; } catch { return d; } };
+const persist = (k, v) => localStorage.setItem(k, JSON.stringify(v));
+
+let brews    = load(K_BREWS,    []);
+let beans    = load(K_BEANS,    []);
+let settings = load(K_SETTINGS, { grinders: [], brewers: [], filters: [] });
+
+/* ──────────────────────────────────────────────────────────────
+   UI state
+────────────────────────────────────────────────────────────── */
+let tab          = 'log';
+let logDate      = today();
+let selBean      = null;
+let selGrinder   = null;
+let selBrewer    = null;
+let selFilter    = null;
+let cvRows       = [];
+let ss           = { hA:5, hS:5, hB:5, cA:5, cS:5, cB:5 }; // sensory state
+let editBeanId   = null;
+let editBrewId   = null;
+let delBrewId    = null;
+let equipType    = null;
+let bpChipType   = null;
+let bpChipVal    = null;
+let brewFrozen   = false;
+let brewDOR      = null; // manual days off roast when frozen
+
+/* ──────────────────────────────────────────────────────────────
+   Init
+────────────────────────────────────────────────────────────── */
+document.addEventListener('DOMContentLoaded', () => {
+  setLogDate(logDate);
+  buildSegControls();
+  initSlider();
+  renderEquipLists();
+  renderBeans();
+  renderDataset();
+  renderStats();
+
+  document.querySelectorAll('.overlay').forEach(o =>
+    o.addEventListener('click', e => { if (e.target === o) closeSheet(o.id); })
+  );
+
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+});
+
+/* ──────────────────────────────────────────────────────────────
+   Tabs
+────────────────────────────────────────────────────────────── */
+const TAB_CFG = {
+  log:      { title: 'New Brew',     eye: 'Coffee Log',       color: '--c-log',      fab: false },
+  bean:     { title: 'Bean Library', eye: 'Coffee Beans',     color: '--c-bean',     fab: true  },
+  dataset:  { title: 'Dataset',      eye: 'All Sessions',     color: '--c-dataset',  fab: false },
+  guide:    { title: 'Tasting Guide',eye: 'Flavor Explorer',  color: '--c-guide',    fab: false },
+  settings: { title: 'Settings',     eye: 'Configuration',    color: '--c-settings', fab: false },
+  stats:    { title: 'Stats',        eye: 'Season Overview',  color: '--c-stats',    fab: false },
+};
+
+function goTab(t) {
+  // Tapping Log tab again while already on it = new brew
+  if (t === 'log' && tab === 'log' && editBrewId) {
+    resetLogForm();
+    document.getElementById('content').scrollTo(0, 0);
+    return;
+  }
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === t));
+  document.querySelectorAll('.tab-page').forEach(p => p.classList.toggle('active', p.id === 'page-' + t));
+  const c = TAB_CFG[t];
+  document.getElementById('hTitle').textContent = editBrewId && t === 'log' ? 'Edit Brew' : c.title;
+  const eye = document.getElementById('hEye');
+  eye.textContent = c.eye;
+  eye.style.color = `var(${c.color})`;
+  const fab = document.getElementById('fab');
+  fab.style.display = c.fab ? 'flex' : 'none';
+  tab = t;
+  if (t === 'dataset') renderDataset();
+  if (t === 'guide')   renderGuide();
+  if (t === 'stats')   renderStats();
+  if (t === 'bean')    renderBeans();
+}
+
+function onFab() {
+  if (tab === 'bean') openAddBean();
+}
+
+/* ──────────────────────────────────────────────────────────────
+   Date
+────────────────────────────────────────────────────────────── */
+function today() { return new Date().toISOString().split('T')[0]; }
+
+function setLogDate(d) {
+  logDate = d;
+  document.getElementById('dateDisplay').textContent = fmtDate(d);
+  document.getElementById('dateInput').value = d;
+}
+
+function fmtDate(d) {
+  return new Date(d + 'T12:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function openDateSheet()  { openSheet('sDate'); }
+function confirmDate()    { const v = document.getElementById('dateInput').value; if (v) setLogDate(v); closeSheet('sDate'); updateDOR(); }
+
+/* ──────────────────────────────────────────────────────────────
+   Days off roast
+────────────────────────────────────────────────────────────── */
+function updateDOR() {
+  const bean = beans.find(b => b.id === selBean);
+  const row = document.getElementById('dorRow');
+  if (!bean || !bean.roastDate) { row.style.display = 'none'; return; }
+  row.style.display = 'flex';
+
+  if (brewFrozen) {
+    // Manual mode — show input
+    document.getElementById('dorValue').style.display = 'none';
+    document.getElementById('dorInput').style.display = '';
+  } else {
+    // Auto-calc mode
+    const brew = new Date(logDate + 'T12:00:00');
+    const roast = new Date(bean.roastDate + 'T12:00:00');
+    const days = Math.max(0, Math.floor((brew - roast) / 86400000));
+    document.getElementById('dorValue').textContent = days;
+    document.getElementById('dorValue').style.display = '';
+    document.getElementById('dorInput').style.display = 'none';
+  }
+
+  // Update frozen button state
+  const btn = document.getElementById('frozenBtn');
+  const lbl = document.getElementById('frozenLabel');
+  btn.classList.toggle('on', brewFrozen);
+  lbl.textContent = brewFrozen ? 'Frozen' : 'No';
+}
+
+function toggleFrozen() {
+  brewFrozen = !brewFrozen;
+  if (brewFrozen) {
+    // Pre-fill with bean's frozenDay if it has one, or current auto-calc
+    const bean = beans.find(b => b.id === selBean);
+    if (bean && bean.frozenDay) {
+      document.getElementById('dorInput').value = bean.frozenDay;
+      brewDOR = bean.frozenDay;
+    } else {
+      const cur = document.getElementById('dorValue').textContent;
+      document.getElementById('dorInput').value = cur !== '—' ? cur : '';
+      brewDOR = parseInt(cur) || null;
+    }
+  }
+  updateDOR();
+}
+
+function onDorManual() {
+  brewDOR = parseInt(document.getElementById('dorInput').value) || null;
+}
+
+function getDOR() {
+  if (!selBean) return null;
+  const bean = beans.find(b => b.id === selBean);
+  if (!bean || !bean.roastDate) return null;
+  if (brewFrozen) return brewDOR;
+  const brew = new Date(logDate + 'T12:00:00');
+  const roast = new Date(bean.roastDate + 'T12:00:00');
+  return Math.max(0, Math.floor((brew - roast) / 86400000));
+}
+
+/* ──────────────────────────────────────────────────────────────
+   EY calc
+────────────────────────────────────────────────────────────── */
+function recalcEY() {
+  const bw   = parseFloat(document.getElementById('lBev').value);
+  const tds  = parseFloat(document.getElementById('lTDS').value);
+  const dose = parseFloat(document.getElementById('lDose').value);
+  const el   = document.getElementById('eyVal');
+  el.textContent = (bw > 0 && tds > 0 && dose > 0) ? ((bw * tds) / dose).toFixed(2) : '—';
+}
+
+/* ──────────────────────────────────────────────────────────────
+   Aroma slider
+────────────────────────────────────────────────────────────── */
+function initSlider() { onSlider(document.getElementById('aromaSlider'), 'aroma'); }
+
+function onSlider(el, key) {
+  const pct = ((el.value - 1) / 8) * 100;
+  el.style.setProperty('--pct', pct + '%');
+  document.getElementById(key + 'Val').textContent = el.value;
+}
+
+/* ──────────────────────────────────────────────────────────────
+   Segmented controls
+────────────────────────────────────────────────────────────── */
+const SEG_DEFS = [
+  { id: 'hAcid',   key: 'hA' },
+  { id: 'hSweet',  key: 'hS' },
+  { id: 'hBitter', key: 'hB' },
+  { id: 'cAcid',   key: 'cA' },
+  { id: 'cSweet',  key: 'cS' },
+  { id: 'cBitter', key: 'cB' },
+];
+
+function buildSegControls() {
+  SEG_DEFS.forEach(({ id, key }) => {
+    const el = document.getElementById(id);
+    el.innerHTML = '';
+    for (let i = 1; i <= 9; i++) {
+      const b = document.createElement('button');
+      b.className = 'seg-btn' + (i === ss[key] ? ' active' : '');
+      b.textContent = i;
+      const vi = i;
+      b.onclick = () => {
+        ss[key] = vi;
+        el.querySelectorAll('.seg-btn').forEach((x, j) => x.classList.toggle('active', j + 1 === vi));
+      };
+      el.appendChild(b);
+    }
+  });
+}
+
+/* ──────────────────────────────────────────────────────────────
+   Custom variables
+────────────────────────────────────────────────────────────── */
+function addCV(k = '', v = '') {
+  cvRows.push({ k, v });
+  renderCV();
+}
+
+function renderCV() {
+  const el = document.getElementById('cvList');
+  el.innerHTML = cvRows.map((r, i) => `
+    <div class="cv-row">
+      <input class="cv-key" type="text" placeholder="Key"   value="${esc(r.k)}" oninput="cvRows[${i}].k=this.value">
+      <input class="cv-val" type="text" placeholder="Value" value="${esc(r.v)}" oninput="cvRows[${i}].v=this.value">
+      <button class="cv-del" onclick="cvRows.splice(${i},1);renderCV()">×</button>
+    </div>`).join('');
+}
+
+/* ──────────────────────────────────────────────────────────────
+   Bean picker
+────────────────────────────────────────────────────────────── */
+function openBeanPicker() {
+  bpChipType = null; bpChipVal = null;
+  document.getElementById('bpSearch').value = '';
+  renderBPChips();
+  renderBPList();
+  openSheet('sBeanPick');
+}
+
+function renderBPChips() {
+  const el = document.getElementById('bpChips');
+  if (beans.length <= 3) { el.style.display = 'none'; return; }
+  el.className = 'chips';
+  el.style.display = 'flex';
+
+  const roasters    = uniq(beans.map(b => b.roaster));
+  const processings = uniq(beans.map(b => b.processing));
+  const varietals   = uniq(beans.map(b => b.varietal));
+
+  const chipHtml = (type, val) => {
+    const on = bpChipType === type && bpChipVal === val;
+    return `<button class="chip${on?' on':''}" onclick="setBPChip('${type}','${esc(val)}')">${esc(val)}</button>`;
+  };
+
+  let h = `<button class="chip${!bpChipType?' on':''}" onclick="setBPChip(null,null)">All</button>`;
+  roasters.forEach(r => { h += chipHtml('roaster', r); });
+  processings.forEach(p => { h += chipHtml('processing', p); });
+  varietals.forEach(v => { h += chipHtml('varietal', v); });
+  el.innerHTML = h;
+}
+
+function setBPChip(t, v) {
+  bpChipType = t; bpChipVal = v;
+  renderBPChips();
+  renderBPList();
+}
+
+function renderBPList() {
+  const q = document.getElementById('bpSearch').value.toLowerCase();
+  let list = beans;
+  if (bpChipType) list = list.filter(b => b[bpChipType] === bpChipVal);
+  if (q) list = list.filter(b => bdn(b).toLowerCase().includes(q));
+  const el = document.getElementById('bpList');
+  if (!list.length) {
+    el.innerHTML = '<div class="empty" style="padding:40px 20px"><div class="empty-title">No beans found</div></div>';
+    return;
+  }
+  el.innerHTML = list.map(b => {
+    const age = beanAge(b);
+    const ageTxt = age ? (age.frozen ? `❄ Day ${age.days}` : `Day ${age.days}`) : '';
+    return `
+    <div class="pick-row${b.id === selBean ? ' selected' : ''}" onclick="pickBean('${b.id}')">
+      <div>
+        <div class="pick-main">${esc(bdn(b))}</div>
+        <div class="pick-sub">${[b.processing,b.varietal].filter(Boolean).map(esc).join(' · ')}${ageTxt?' · '+ageTxt:''}</div>
+      </div>
+      <span class="pick-check">✓</span>
+    </div>`;
+  }).join('');
+}
+
+function pickBean(id) {
+  selBean = id;
+  const b = beans.find(x => x.id === id);
+  const d = document.getElementById('beanDisplay');
+  d.textContent = b ? bdn(b) : 'Select bean';
+  d.style.color = b ? 'var(--text)' : 'var(--text3)';
+  closeSheet('sBeanPick');
+  // Reset frozen state for new bean, auto-detect if bean has frozenDay
+  brewFrozen = !!(b && b.frozenDay);
+  brewDOR = b?.frozenDay || null;
+  if (brewFrozen) document.getElementById('dorInput').value = brewDOR;
+  updateDOR();
+}
+
+function bdn(b) {
+  return [b.roaster, b.farm, b.processing, b.varietal].filter(Boolean).join(' · ');
+}
+
+function beanAge(b, refDate) {
+  if (!b || !b.roastDate) return null;
+  if (b.frozenDay != null) return { days: b.frozenDay, frozen: true };
+  const ref = refDate ? new Date(refDate + 'T12:00:00') : new Date();
+  const roast = new Date(b.roastDate + 'T12:00:00');
+  const days = Math.floor((ref - roast) / 86400000);
+  if (days < 0) return null;
+  return { days, frozen: false };
+}
+
+function ageHtml(age, cls) {
+  if (!age) return '';
+  const label = age.frozen ? `Frozen · Day ${age.days}` : `Day ${age.days}`;
+  const fclass = age.frozen ? ' frozen' : '';
+  return `<span class="${cls}${fclass}">${label}</span>`;
+}
+
+/* ──────────────────────────────────────────────────────────────
+   Equipment picker
+────────────────────────────────────────────────────────────── */
+function openEquip(type) {
+  equipType = type;
+  const titles = { grinder: 'Select Grinder', brewer: 'Select Brewer', filter: 'Select Filter' };
+  document.getElementById('equipTitle').textContent = titles[type];
+  const list = settings[type + 's'] || [];
+  const cur  = type === 'grinder' ? selGrinder : type === 'brewer' ? selBrewer : selFilter;
+  const el   = document.getElementById('equipList');
+  if (!list.length) {
+    el.innerHTML = `<div class="empty" style="padding:40px 20px"><div class="empty-title">No ${type}s added</div><div class="empty-sub">Add one in Settings</div></div>`;
+  } else {
+    el.innerHTML = list.map(item => `
+      <div class="pick-row${item===cur?' selected':''}" onclick="pickEquip('${esc(item)}')">
+        <div class="pick-main">${esc(item)}</div>
+        <span class="pick-check">✓</span>
+      </div>`).join('');
+  }
+  openSheet('sEquip');
+}
+
+function pickEquip(val) {
+  const disp = { grinder: 'grinderDisplay', brewer: 'brewerDisplay', filter: 'filterDisplay' };
+  if (equipType === 'grinder') selGrinder = val;
+  else if (equipType === 'brewer') selBrewer = val;
+  else selFilter = val;
+  const d = document.getElementById(disp[equipType]);
+  d.textContent = val;
+  d.style.color = 'var(--text)';
+  closeSheet('sEquip');
+}
+
+/* ──────────────────────────────────────────────────────────────
+   Save brew
+────────────────────────────────────────────────────────────── */
+function saveBrew() {
+  const dose = parseFloat(document.getElementById('lDose').value)  || 0;
+  const water = parseFloat(document.getElementById('lWater').value) || 0;
+  const bev   = parseFloat(document.getElementById('lBev').value)   || 0;
+  const tds   = parseFloat(document.getElementById('lTDS').value)   || 0;
+  const ey    = (bev > 0 && tds > 0 && dose > 0) ? parseFloat(((bev * tds) / dose).toFixed(2)) : null;
+
+  const brew = {
+    id: editBrewId || uid(),
+    beanId: selBean,
+    name:   v('lName'),
+    date:   logDate,
+    grinder: selGrinder,
+    brewer:  selBrewer,
+    filter:  selFilter,
+    dose, water,
+    temp:        nv('lTemp'),
+    grind:       v('lGrind'),
+    bloom:       nv('lBloom'),
+    totalTime:   v('lTime'),
+    beverageWeight: bev || null,
+    tds:   tds || null,
+    ey,
+    notes:  v('lNotes'),
+    adjust: v('lAdjust'),
+    score:  nv('lScore'),
+    daysOffRoast: getDOR(),
+    frozen: brewFrozen,
+    customVars: cvRows.filter(r => r.k).map(r => ({ ...r })),
+    aroma: {
+      intensity: parseInt(document.getElementById('aromaSlider').value),
+      notes: v('aromaNotes'),
+    },
+    hot: {
+      acidity: ss.hA, sweetness: ss.hS, bitterness: ss.hB,
+      notes: v('hotNotes'),
+    },
+    cool: {
+      acidity: ss.cA, sweetness: ss.cS, bitterness: ss.cB,
+      notes: v('coolNotes'),
+    },
+  };
+
+  if (editBrewId) {
+    const i = brews.findIndex(b => b.id === editBrewId);
+    if (i >= 0) brews[i] = brew;
+  } else {
+    brews.unshift(brew);
+  }
+  persist(K_BREWS, brews);
+  const wasNew = !editBrewId;
+  editBrewId = brew.id;  // keep reference so next save updates this brew
+  TAB_CFG.log.title = 'Edit Brew';
+  document.getElementById('hTitle').textContent = 'Edit Brew';
+  showToast(wasNew ? 'Brew saved ✓' : 'Brew updated');
+}
+
+function resetLogForm() {
+  selBean = selGrinder = selBrewer = selFilter = null;
+  cvRows = [];
+  ['lName','lDose','lWater','lTemp','lGrind','lBloom','lTime','lBev','lTDS','lScore','lNotes','lAdjust','aromaNotes','hotNotes','coolNotes']
+    .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  document.getElementById('beanDisplay').textContent    = 'Select bean';
+  document.getElementById('beanDisplay').style.color    = 'var(--text3)';
+  document.getElementById('grinderDisplay').textContent = 'Select';
+  document.getElementById('grinderDisplay').style.color = '';
+  document.getElementById('brewerDisplay').textContent  = 'Select';
+  document.getElementById('brewerDisplay').style.color  = '';
+  document.getElementById('filterDisplay').textContent  = 'Select';
+  document.getElementById('filterDisplay').style.color  = '';
+  document.getElementById('eyVal').textContent = '—';
+  brewFrozen = false; brewDOR = null;
+  document.getElementById('dorInput').value = '';
+  updateDOR();
+  document.getElementById('aromaSlider').value = 5;
+  initSlider();
+  ss = { hA:5, hS:5, hB:5, cA:5, cS:5, cB:5 };
+  buildSegControls();
+  renderCV();
+  setLogDate(today());
+  TAB_CFG.log.title = 'New Brew';
+  document.getElementById('hTitle').textContent = 'New Brew';
+}
+
+/* ──────────────────────────────────────────────────────────────
+   Bean library
+────────────────────────────────────────────────────────────── */
+function renderBeans() {
+  const el = document.getElementById('beanListSection');
+  if (!beans.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">🌱</div><div class="empty-title">No beans yet</div><div class="empty-sub">Tap + to add your first bean</div></div>';
+    return;
+  }
+  el.innerHTML = beans.map(b => {
+    const age = beanAge(b);
+    return `
+    <div class="bean-card" onclick="editBeanOpen('${b.id}')">
+      <div class="bean-name">${esc(bdn(b))}</div>
+      <div class="tags">
+        ${b.roaster    ? `<span class="tag tag-r">${esc(b.roaster)}</span>`    : ''}
+        ${b.farm       ? `<span class="tag tag-f">${esc(b.farm)}</span>`       : ''}
+        ${b.processing ? `<span class="tag tag-p">${esc(b.processing)}</span>` : ''}
+        ${b.varietal   ? `<span class="tag tag-v">${esc(b.varietal)}</span>`   : ''}
+        ${b.other      ? `<span class="tag tag-o">${esc(b.other)}</span>`      : ''}
+      </div>
+      ${age ? `<div class="bean-age${age.frozen?' bean-age-frozen':''}">${age.frozen?'❄ Frozen · Day '+age.days:'Day '+age.days+' post-roast'}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function openAddBean() {
+  editBeanId = null;
+  document.getElementById('addBeanTitle').textContent = 'Add Bean';
+  document.getElementById('saveBeanBtn').textContent  = 'Add Bean';
+  ['bRoaster','bFarm','bProc','bVarietal','bOther','bRoastDate','bFrozenDay'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('delBeanBtn').style.display = 'none';
+  openSheet('sAddBean');
+}
+
+function editBeanOpen(id) {
+  editBeanId = id;
+  const b = beans.find(x => x.id === id);
+  if (!b) return;
+  document.getElementById('addBeanTitle').textContent = 'Edit Bean';
+  document.getElementById('saveBeanBtn').textContent  = 'Save Changes';
+  document.getElementById('bRoaster').value  = b.roaster    || '';
+  document.getElementById('bFarm').value     = b.farm       || '';
+  document.getElementById('bProc').value     = b.processing || '';
+  document.getElementById('bVarietal').value = b.varietal   || '';
+  document.getElementById('bOther').value    = b.other      || '';
+  document.getElementById('bRoastDate').value = b.roastDate  || '';
+  document.getElementById('bFrozenDay').value = b.frozenDay != null ? b.frozenDay : '';
+  document.getElementById('delBeanBtn').style.display = 'block';
+  openSheet('sAddBean');
+}
+
+function saveBean() {
+  const roaster = document.getElementById('bRoaster').value.trim();
+  if (!roaster) { showToast('Roaster is required'); return; }
+  const bean = {
+    id: editBeanId || uid(),
+    roaster,
+    farm:       document.getElementById('bFarm').value.trim(),
+    processing: document.getElementById('bProc').value.trim(),
+    varietal:   document.getElementById('bVarietal').value.trim(),
+    other:      document.getElementById('bOther').value.trim(),
+    roastDate:  document.getElementById('bRoastDate').value || null,
+    frozenDay:  parseInt(document.getElementById('bFrozenDay').value) || null,
+  };
+  if (editBeanId) {
+    const i = beans.findIndex(b => b.id === editBeanId);
+    if (i >= 0) beans[i] = bean;
+  } else {
+    beans.unshift(bean);
+  }
+  persist(K_BEANS, beans);
+  renderBeans();
+  closeSheet('sAddBean');
+  showToast(editBeanId ? 'Bean updated' : 'Bean added');
+  editBeanId = null;
+}
+
+let delMode = 'brew'; // 'brew' or 'bean'
+
+function askDeleteBean() {
+  delMode = 'bean';
+  document.getElementById('confDelTitle').textContent = 'Delete Bean?';
+  closeSheet('sAddBean');
+  openSheet('sConfDel');
+}
+
+/* ──────────────────────────────────────────────────────────────
+   Dataset
+────────────────────────────────────────────────────────────── */
+function renderDataset() {
+  const el = document.getElementById('datasetSection');
+  const q = (document.getElementById('dsSearch')?.value || '').trim().toLowerCase();
+  let filtered = brews;
+  if (q) {
+    filtered = brews.filter(brew => {
+      const bean = beans.find(b => b.id === brew.beanId);
+      const haystack = [bean?.roaster, bean?.farm, bean?.processing, bean?.varietal, bean?.other, brew.name, brew.brewer, brew.grinder].filter(Boolean).join(' ').toLowerCase();
+      return haystack.includes(q);
+    });
+  }
+  if (!filtered.length) {
+    el.innerHTML = q
+      ? '<div class="empty"><div class="empty-icon">🔍</div><div class="empty-title">No matches</div><div class="empty-sub">Try a different search term</div></div>'
+      : '<div class="empty"><div class="empty-icon">📋</div><div class="empty-title">No brews yet</div><div class="empty-sub">Log your first brew in the Log tab</div></div>';
+    return;
+  }
+  el.innerHTML = filtered.map(brew => {
+    const bean  = beans.find(b => b.id === brew.beanId);
+    const name  = bean ? bdn(bean) : (brew.name || 'Unnamed brew');
+    const ratio = (brew.dose && brew.water) ? '1:' + (brew.water / brew.dose).toFixed(1) : '—';
+    const temp  = brew.temp ? brew.temp + '°' : '—';
+    const equip = [brew.brewer, brew.grinder].filter(Boolean).map(esc).join(' · ') || 'No equipment';
+    return `
+    <div class="brew-wrap" id="wrap-${brew.id}">
+      <div class="brew-del-bg" onclick="askDelete('${brew.id}')">Delete</div>
+      <div class="brew-card" id="card-${brew.id}"
+        ontouchstart="ts(event,'${brew.id}')" ontouchmove="tm(event,'${brew.id}')" ontouchend="te(event,'${brew.id}')"
+        onclick="toggleBrewCard('${brew.id}')"
+        oncontextmenu="openCtx(event,'${brew.id}')">
+        <div class="brew-bean">${esc(name)}${ageHtml(beanAge(bean, brew.date), 'brew-age-tag')}</div>
+        <div class="brew-sub">${equip}</div>
+        <div class="brew-stats">
+          <div class="brew-stat"><span class="brew-stat-label">Grind</span><span class="brew-stat-val">${esc(brew.grind||'—')}</span></div>
+          <div class="brew-stat"><span class="brew-stat-label">Ratio</span><span class="brew-stat-val">${ratio}</span></div>
+          <div class="brew-stat"><span class="brew-stat-label">Temp</span><span class="brew-stat-val">${temp}</span></div>
+          ${brew.score!=null?`<span class="brew-score-badge">${brew.score}</span>`:''}
+        </div>
+        <div class="brew-expand">
+          <div class="mini-row">
+            <div class="mini-card mini-a"><div class="mini-label">Aroma</div><div class="mini-val">${brew.aroma?.intensity||'—'}</div><div class="mini-notes">${esc(brew.aroma?.notes||'')}</div></div>
+            <div class="mini-card mini-h"><div class="mini-label">Hot</div><div class="mini-val">${brew.hot?[brew.hot.acidity,brew.hot.sweetness,brew.hot.bitterness].join('/'):' —'}</div><div class="mini-notes">${esc(brew.hot?.notes||'')}</div></div>
+            <div class="mini-card mini-c"><div class="mini-label">Cool</div><div class="mini-val">${brew.cool?[brew.cool.acidity,brew.cool.sweetness,brew.cool.bitterness].join('/'):' —'}</div><div class="mini-notes">${esc(brew.cool?.notes||'')}</div></div>
+          </div>
+          ${brew.notes?`<div class="brew-notes-snip">${esc(brew.notes)}</div>`:''}
+          ${brew.ey!=null?`<div class="brew-ey-line">EY: ${brew.ey}%</div>`:''}
+          <div class="brew-actions">
+            <button class="edit-brew-btn" onclick="editBrewOpen(event,'${brew.id}')">Edit</button>
+            <button class="clone-brew-btn" onclick="cloneBrew(event,'${brew.id}')">Duplicate</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleBrewCard(id) {
+  document.getElementById('card-' + id)?.classList.toggle('open');
+}
+
+/* swipe to delete */
+const _sw = {};
+function ts(e, id) {
+  const t = e.touches[0];
+  _sw[id] = { x: t.clientX, y: t.clientY };
+}
+function tm(e, id) {
+  const d = _sw[id]; if (!d) return;
+  const dx = e.touches[0].clientX - d.x;
+  const dy = e.touches[0].clientY - d.y;
+  if (Math.abs(dy) > Math.abs(dx)) return;
+  e.preventDefault();
+  const card = document.getElementById('card-' + id);
+  if (card && dx < 0) card.style.transform = `translateX(${Math.max(dx, -80)}px)`;
+}
+function te(e, id) {
+  const d = _sw[id]; if (!d) return;
+  const dx = e.changedTouches[0].clientX - d.x;
+  const card = document.getElementById('card-' + id);
+  if (dx < -48) {
+    if (card) card.style.transform = 'translateX(-80px)';
+    setTimeout(() => { if (card) card.style.transform = ''; }, 3500);
+  } else {
+    if (card) card.style.transform = '';
+  }
+  delete _sw[id];
+}
+
+/* context menu (right-click / long press) */
+let ctxBrewId = null;
+function openCtx(e, id) {
+  e.preventDefault();
+  e.stopPropagation();
+  ctxBrewId = id;
+  const menu = document.getElementById('ctxMenu');
+  menu.classList.add('open');
+  const x = Math.min(e.clientX || e.pageX, window.innerWidth - 170);
+  const y = Math.min(e.clientY || e.pageY, window.innerHeight - 140);
+  menu.style.left = x + 'px';
+  menu.style.top  = y + 'px';
+}
+function closeCtx() {
+  document.getElementById('ctxMenu').classList.remove('open');
+  ctxBrewId = null;
+}
+function ctxAction(action) {
+  const id = ctxBrewId;
+  closeCtx();
+  if (!id) return;
+  if (action === 'edit')   { editBrewOpen(new Event('click'), id); }
+  else if (action === 'clone')  { cloneBrew(new Event('click'), id); }
+  else if (action === 'delete') { askDelete(id); }
+}
+document.addEventListener('click', closeCtx);
+
+function askDelete(id) {
+  delBrewId = id;
+  delMode = 'brew';
+  document.getElementById('confDelTitle').textContent = 'Delete Brew?';
+  openSheet('sConfDel');
+}
+function confirmDelete() {
+  if (delMode === 'bean' && editBeanId) {
+    beans = beans.filter(b => b.id !== editBeanId);
+    persist(K_BEANS, beans);
+    renderBeans();
+    showToast('Bean deleted');
+    editBeanId = null;
+  } else if (delBrewId) {
+    brews = brews.filter(b => b.id !== delBrewId);
+    persist(K_BREWS, brews);
+    renderDataset();
+    showToast('Brew deleted');
+    delBrewId = null;
+  }
+  closeSheet('sConfDel');
+}
+
+function editBrewOpen(e, id) {
+  e.stopPropagation();
+  const brew = brews.find(b => b.id === id);
+  if (!brew) return;
+  editBrewId = id;
+
+  selBean    = brew.beanId;
+  selGrinder = brew.grinder;
+  selBrewer  = brew.brewer;
+  selFilter  = brew.filter;
+
+  const bean = beans.find(b => b.id === brew.beanId);
+  const bd = document.getElementById('beanDisplay');
+  bd.textContent = bean ? bdn(bean) : 'Select bean';
+  bd.style.color = bean ? 'var(--text)' : 'var(--text3)';
+
+  setDisp('grinderDisplay', brew.grinder, 'Select');
+  setDisp('brewerDisplay',  brew.brewer,  'Select');
+  setDisp('filterDisplay',  brew.filter,  'Select');
+
+  setV('lName',  brew.name);
+  setV('lDose',  brew.dose);
+  setV('lWater', brew.water);
+  setV('lTemp',  brew.temp);
+  setV('lGrind', brew.grind);
+  setV('lBloom', brew.bloom);
+  setV('lTime',  brew.totalTime);
+  setV('lBev',   brew.beverageWeight);
+  setV('lTDS',   brew.tds);
+  setV('lScore', brew.score);
+  setV('lNotes', brew.notes);
+  setV('lAdjust',brew.adjust);
+  setV('aromaNotes', brew.aroma?.notes);
+  setV('hotNotes',   brew.hot?.notes);
+  setV('coolNotes',  brew.cool?.notes);
+
+  document.getElementById('aromaSlider').value = brew.aroma?.intensity || 5;
+  initSlider();
+
+  if (brew.hot)  { ss.hA = brew.hot.acidity||5;  ss.hS = brew.hot.sweetness||5;  ss.hB = brew.hot.bitterness||5; }
+  if (brew.cool) { ss.cA = brew.cool.acidity||5; ss.cS = brew.cool.sweetness||5; ss.cB = brew.cool.bitterness||5; }
+  buildSegControls();
+
+  cvRows = (brew.customVars || []).map(r => ({ ...r }));
+  renderCV();
+  recalcEY();
+  setLogDate(brew.date || today());
+
+  // Restore frozen / DOR state
+  brewFrozen = !!brew.frozen;
+  brewDOR = brew.daysOffRoast || null;
+  if (brewFrozen && brewDOR != null) document.getElementById('dorInput').value = brewDOR;
+  updateDOR();
+
+  TAB_CFG.log.title = 'Edit Brew';
+  goTab('log');
+  document.getElementById('content').scrollTo(0, 0);
+}
+
+function cloneBrew(e, id) {
+  e.stopPropagation();
+  const brew = brews.find(b => b.id === id);
+  if (!brew) return;
+
+  // Same as editBrewOpen but NO editBrewId — it's a new brew
+  editBrewId = null;
+
+  selBean    = brew.beanId;
+  selGrinder = brew.grinder;
+  selBrewer  = brew.brewer;
+  selFilter  = brew.filter;
+
+  const bean = beans.find(b => b.id === brew.beanId);
+  const bd = document.getElementById('beanDisplay');
+  bd.textContent = bean ? bdn(bean) : 'Select bean';
+  bd.style.color = bean ? 'var(--text)' : 'var(--text3)';
+
+  setDisp('grinderDisplay', brew.grinder, 'Select');
+  setDisp('brewerDisplay',  brew.brewer,  'Select');
+  setDisp('filterDisplay',  brew.filter,  'Select');
+
+  setV('lName',  brew.name);
+  setV('lDose',  brew.dose);
+  setV('lWater', brew.water);
+  setV('lTemp',  brew.temp);
+  setV('lGrind', brew.grind);
+  setV('lBloom', brew.bloom);
+  setV('lTime',  brew.totalTime);
+  setV('lBev',   '');  // clear extraction — new brew
+  setV('lTDS',   '');
+  setV('lScore', '');
+  setV('lNotes', brew.notes);
+  setV('lAdjust', brew.adjust);
+  setV('aromaNotes', '');
+  setV('hotNotes',   '');
+  setV('coolNotes',  '');
+
+  document.getElementById('aromaSlider').value = 5;
+  initSlider();
+  ss = { hA:5, hS:5, hB:5, cA:5, cS:5, cB:5 };
+  buildSegControls();
+
+  cvRows = (brew.customVars || []).map(r => ({ ...r }));
+  renderCV();
+  recalcEY();
+  setLogDate(today());  // new date for cloned brew
+
+  // Reset frozen for clone, let auto-calc
+  brewFrozen = false; brewDOR = null;
+  document.getElementById('dorInput').value = '';
+  updateDOR();
+
+  TAB_CFG.log.title = 'New Brew';
+  goTab('log');
+  document.getElementById('content').scrollTo(0, 0);
+  showToast('Duplicated — adjust and save');
+}
+
+/* ──────────────────────────────────────────────────────────────
+   Settings
+────────────────────────────────────────────────────────────── */
+function toggleSection(type) {
+  document.getElementById('ss-' + type).classList.toggle('open');
+}
+
+function renderEquipLists() {
+  ['grinder','brewer','filter'].forEach(renderEquipList);
+}
+
+function renderEquipList(type) {
+  const list = settings[type + 's'] || [];
+  const el   = document.getElementById('sl-' + type);
+  if (!list.length) {
+    el.innerHTML = `<div style="padding:12px 16px;color:var(--text3);font-size:14px">None added yet</div>`;
+    return;
+  }
+  el.innerHTML = list.map((item, i) => `
+    <div class="s-item">
+      <span class="s-item-name">${esc(item)}</span>
+      <button class="s-del" onclick="removeEquipItem('${type}',${i})">×</button>
+    </div>`).join('');
+}
+
+function addEquipItem(type) {
+  const inp = document.getElementById('si-' + type);
+  const val = inp.value.trim();
+  if (!val) return;
+  if (!settings[type + 's']) settings[type + 's'] = [];
+  settings[type + 's'].push(val);
+  persist(K_SETTINGS, settings);
+  renderEquipList(type);
+  inp.value = '';
+  showToast(val + ' added');
+}
+
+function removeEquipItem(type, i) {
+  settings[type + 's'].splice(i, 1);
+  persist(K_SETTINGS, settings);
+  renderEquipList(type);
+}
+
+/* ──────────────────────────────────────────────────────────────
+   Stats
+────────────────────────────────────────────────────────────── */
+function renderStats() {
+  const scored = brews.filter(b => b.score != null);
+  const withEY = brews.filter(b => b.ey   != null);
+  const avg    = arr => arr.length ? arr.reduce((a,b) => a+b, 0) / arr.length : 0;
+
+  document.getElementById('stBrews').textContent = brews.length;
+  document.getElementById('stBeans').textContent = beans.length;
+  document.getElementById('stScore').textContent = scored.length ? (scored.reduce((s,b)=>s+b.score,0)/scored.length).toFixed(1) : '—';
+  document.getElementById('stEY').textContent    = withEY.length ? (withEY.reduce((s,b)=>s+b.ey,0)/withEY.length).toFixed(1)+'%' : '—';
+
+  const barsEl = document.getElementById('sensoryBars');
+  if (!brews.length) {
+    barsEl.innerHTML = '<div style="color:var(--text3);font-size:14px;text-align:center;padding:6px 0">No data yet</div>';
+  } else {
+    const bars = [
+      { label: 'Aroma',         cls: 'bar-aroma',   val: avg(brews.map(b => b.aroma?.intensity).filter(Boolean)) },
+      { label: 'Hot acidity',   cls: 'bar-acidity', val: avg(brews.map(b => b.hot?.acidity).filter(Boolean)) },
+      { label: 'Hot sweetness', cls: 'bar-sweet',   val: avg(brews.map(b => b.hot?.sweetness).filter(Boolean)) },
+      { label: 'Hot bitterness',cls: 'bar-bitter',  val: avg(brews.map(b => b.hot?.bitterness).filter(Boolean)) },
+      { label: 'Cool acidity',  cls: 'bar-cool',    val: avg(brews.map(b => b.cool?.acidity).filter(Boolean)) },
+    ];
+    barsEl.innerHTML = bars.map(bar => `
+      <div class="bar-row">
+        <div class="bar-hdr">
+          <span class="bar-name">${bar.label}</span>
+          <span class="bar-num">${bar.val ? bar.val.toFixed(1) : '—'} / 9</span>
+        </div>
+        <div class="bar-track">
+          <div class="bar-fill ${bar.cls}" style="width:${bar.val?(bar.val/9*100).toFixed(1):0}%"></div>
+        </div>
+      </div>`).join('');
+  }
+
+  const recentEl = document.getElementById('recentBrews');
+  const recent   = brews.slice(0, 5);
+  if (!recent.length) {
+    recentEl.innerHTML = '<div style="padding:16px;color:var(--text3);font-size:14px;text-align:center">No brews yet</div>';
+  } else {
+    recentEl.innerHTML = recent.map(brew => {
+      const bean = beans.find(b => b.id === brew.beanId);
+      const name = bean ? bdn(bean) : (brew.name || 'Unnamed');
+      const sub  = [fmtDate(brew.date), brew.brewer].filter(Boolean).join(' · ');
+      return `
+      <div class="recent-row">
+        <div class="recent-info">
+          <div class="recent-name">${esc(name)}</div>
+          <div class="recent-meta">${esc(sub)}</div>
+        </div>
+        ${brew.score!=null?`<div class="recent-score">${brew.score}</div>`:''}
+      </div>`;
+    }).join('');
+  }
+}
+
+function renderGuide() {
+  renderWheel('flavourWheel', FLAVOUR_WHEEL, _fwState);
+  renderWheel('acidityWheel', ACIDITY_GUIDE, _awState);
+  renderWheel('sweetnessWheel', SWEETNESS_GUIDE, _swState);
+}
+
+/* ──────────────────────────────────────────────────────────────
+   Flavour & Texture Wheels
+────────────────────────────────────────────────────────────── */
+const FLAVOUR_WHEEL = {
+  _colors: { Fruity:'#e74c3c', Floral:'#e984c9', Sweet:'#f39c12', Nutty:'#8d6e63', Chocolatey:'#5d4037', Spicy:'#d35400', Roasted:'#795548', Vegetal:'#27ae60', Sour:'#f1c40f', Fermented:'#9b59b6', 'Tea-like':'#2ecc71', Cereal:'#bfa46f', 'By Color':'#666' },
+  Fruity: {
+    _color: '#e74c3c',
+    'Berry': {
+      _color: '#c0392b',
+      Strawberry: 'Sweet, juicy, and bright with a candy-like fragrance. Think ripe summer strawberries.',
+      Blueberry: 'Deep, jammy sweetness with a slightly wine-like quality. Common in natural Ethiopian coffees.',
+      Raspberry: 'Tart and vibrant with a tangy, bright sweetness. Adds a sparkling quality to the cup.',
+      Blackberry: 'Rich, dark berry flavour with earthy undertones. Bold and slightly tannic.',
+      Cranberry: 'Sharp, tart acidity with a dry, astringent finish. Crisp and clean.',
+      Boysenberry: 'Complex cross between raspberry, blackberry, and loganberry. Deep, tart-sweet with a jammy intensity. Competition favourite.',
+      'Red currant': 'Bright, tart, and jewel-like. Sharp acidity with a delicate sweetness. Often used to describe sparkling acidity in competition.',
+      Mulberry: 'Soft, wine-like berry with a mild, honeyed sweetness. Subtle and elegant.',
+    },
+    'Citrus': {
+      _color: '#e67e22',
+      Lemon: 'Bright, zesty, and sharp acidity. Clean and refreshing, often in washed coffees.',
+      Orange: 'Sweet citrus with a rounded, juicy quality. Warm and inviting.',
+      Grapefruit: 'Bittersweet citrus with a tangy edge. Adds complexity and a slightly pithy finish.',
+      Lime: 'Sharp, electric acidity with a green, zesty punch. Very bright and lively.',
+      Tangerine: 'Sweeter than orange with a candy-like, aromatic citrus quality.',
+      'Blood orange': 'Rich, deep citrus with berry undertones. Sweet-tart and complex.',
+      Yuzu: 'Japanese citrus — aromatic, tart, and floral. Between grapefruit and mandarin. A sophisticated competition descriptor.',
+      Kumquat: 'Edible-skin citrus with a sweet rind and sour flesh. Complex sweet-bitter-tart layers.',
+      Bergamot: 'The citrus in Earl Grey tea. Floral, aromatic, and slightly bitter. Elegant and distinctive.',
+      Mandarin: 'Sweet, rounded citrus. Less acidic than orange with a candy-like, easy sweetness.',
+    },
+    'Stone fruit': {
+      _color: '#d4513a',
+      Peach: 'Soft, velvety sweetness with floral undertones. Delicate and juicy.',
+      Apricot: 'Bright and sweet with a slightly tangy, honeyed quality.',
+      Nectarine: 'Like peach but with more acidity and a snappy brightness.',
+      Plum: 'Deep, rich sweetness with a wine-like quality. Luxurious and full.',
+      Cherry: 'Can be sweet (maraschino) or tart (sour cherry). Very common in quality coffees.',
+      'Black cherry': 'Deeper and more intense than regular cherry. Rich, wine-like, and luxurious. Common in anaerobic naturals.',
+      'White peach': 'More delicate and floral than yellow peach. Subtly sweet with a perfumed, elegant quality.',
+      Mirabelle: 'Small golden plum. Honeyed, delicate stone fruit sweetness. Rare and elegant competition descriptor.',
+    },
+    'Tropical': {
+      _color: '#e84393',
+      Mango: 'Lush, creamy tropical sweetness with a perfumed, aromatic quality.',
+      Pineapple: 'Bright, tangy sweetness with a fermented edge. Punchy and vibrant.',
+      Passionfruit: 'Intensely aromatic with tart, exotic sweetness. Complex and fragrant.',
+      Papaya: 'Soft, musky tropical sweetness with a creamy texture.',
+      Lychee: 'Perfumed, delicate sweetness with floral and grape-like qualities.',
+      Guava: 'Punchy tropical with a mix of sweet and tart. Pink and aromatic.',
+      Jackfruit: 'Bold, sweet tropical with bubblegum and pineapple undertones. Unique and complex.',
+      'Dragon fruit': 'Mild, subtly sweet with a refreshing, melon-like quality. Delicate tropical.',
+      Starfruit: 'Crisp, tart, and mildly sweet. Cross between apple, pear, and citrus.',
+      Tamarind: 'Sweet-sour with a sticky, date-like depth. Complex tropical acidity used in competition to describe unique fermentation profiles.',
+    },
+    'Dried fruit': {
+      _color: '#a0522d',
+      Raisin: 'Concentrated, caramelised grape sweetness. Rich and wine-like.',
+      Date: 'Deep, caramel-like sweetness with a sticky, toffee quality.',
+      Fig: 'Complex sweetness with earthy, jammy undertones. Syrupy and warm.',
+      Prune: 'Dark, rich dried plum with a slightly fermented, wine-like depth.',
+      'Dried apricot': 'Concentrated, tangy sweetness with a honeyed depth. More intense than fresh apricot.',
+      'Dried mango': 'Chewy, concentrated tropical sweetness. Caramelised and rich.',
+    },
+    'Pome fruit': {
+      _color: '#e55b3c',
+      'Green apple': 'Crisp, tart, and snappy. Malic acidity — bright and clean.',
+      'Red apple': 'Sweeter and rounder than green apple. Juicy and balanced.',
+      Pear: 'Delicate, soft sweetness with a light, clean finish.',
+      'Asian pear': 'Crisper and more refreshing than European pear. Juicy, clean, and light. Popular in Brewers Cup routines for describing delicate washed coffees.',
+      Quince: 'Fragrant, floral pome fruit. Honeyed and slightly tart when ripe. Elegant and uncommon.',
+    },
+  },
+  Floral: {
+    _color: '#e984c9',
+    Jasmine: 'Intensely perfumed, sweet, and heady. Elegant and aromatic. Common in Ethiopian coffees.',
+    Rose: 'Delicate, romantic fragrance with a sweet, slightly spicy quality.',
+    Lavender: 'Herbal and calming with a slightly camphorous, perfumed sweetness.',
+    Hibiscus: 'Tart and cranberry-like with a deep red, floral tang.',
+    'Orange blossom': 'Sweet, citrusy floral aroma. Light and refreshing, like neroli.',
+    Chamomile: 'Soft, honeyed floral with a calming, tea-like quality.',
+    Elderflower: 'Delicate, lightly sweet with a muscat grape-like fragrance.',
+    Honeysuckle: 'Sweet nectar-like aroma with a creamy, gentle quality.',
+    Violet: 'Delicate, powdery floral with a sweet, candy-like quality. Think Parma violets. Often used in competition for Gesha descriptions.',
+    Ylang: 'Exotic, intensely sweet floral. Creamy and tropical. Used in competition to describe complex aromatics.',
+    Gardenia: 'Rich, creamy white floral with a sweet, heady intensity. Luxurious and bold.',
+    Wisteria: 'Light, grape-like floral with a gentle, sweet fragrance. Airy and delicate.',
+    'Osmanthus': 'Apricot-scented floral used in Chinese tea culture. Fruity, sweet, and delicate. Gaining popularity in competition descriptors.',
+    Magnolia: 'Lemony, sweet, creamy floral. Between citrus and floral — elegant and refined.',
+    Neroli: 'Orange blossom essential oil note. Bright, citrusy-floral, and uplifting. Sophisticated competition descriptor.',
+  },
+  Sweet: {
+    _color: '#f39c12',
+    'Brown sugar': {
+      _color: '#d68910',
+      'Brown sugar': 'Warm, molasses-tinged sweetness. Caramelised and rich.',
+      Molasses: 'Deep, dark, bittersweet with a thick, syrupy heaviness.',
+      'Maple syrup': 'Woodsy, caramelised sweetness with buttery undertones.',
+      Muscovado: 'Raw, unrefined sugar with deep toffee and rum notes.',
+      Panela: 'Unrefined whole cane sugar from South America. Earthy, fudgy sweetness with a raw, rustic quality. Very common in competition — especially for Colombian coffees.',
+      Piloncillo: 'Mexican unrefined sugar. Similar to panela with smoky, rum-like undertones.',
+      Demerara: 'Large-crystal raw sugar with a mild, toffee-like sweetness. Less intense than brown sugar.',
+    },
+    Honey: {
+      _color: '#e8a817',
+      'Wildflower honey': 'Complex, aromatic honey with floral and herbal notes.',
+      'Clover honey': 'Clean, light, straightforward sweetness.',
+      Manuka: 'Bold, earthy honey with herbal, slightly medicinal depth.',
+    },
+    Caramel: {
+      _color: '#ca6f1e',
+      Caramel: 'Smooth, buttery, cooked sugar sweetness. Comforting and rich.',
+      Toffee: 'Buttery, slightly bitter caramelised sugar. Chewy and warm.',
+      Butterscotch: 'Buttery, vanilla-tinged caramel. Sweet and creamy.',
+      'Burnt sugar': 'Bittersweet with a dark, smoky caramel edge.',
+    },
+    Vanilla: 'Smooth, creamy, warm sweetness with a fragrant, custard-like quality.',
+    'Cotton candy': 'Light, airy, pure sugar sweetness with no bitterness.',
+    'Cane juice': 'Fresh, green, raw sugar sweetness. Lighter and more vegetal than refined sugar. Common competition descriptor for clean, sweet coffees.',
+    'Candied fruit': 'Glazed, sugar-coated fruit quality. Sweet and intense with a glossy, preserved character.',
+    Marzipan: 'Sweet almond paste with a smooth, confectionery quality. Nutty-sweet hybrid found in many competition-winning routines.',
+    Nougat: 'Chewy, sweet confection with nut and honey notes. Soft, comforting, and rich.',
+  },
+  Nutty: {
+    _color: '#8d6e63',
+    Almond: 'Sweet, marzipan-like nuttiness with a delicate, fragrant quality.',
+    Hazelnut: 'Rich, buttery nuttiness. Creamy and warm, like Nutella.',
+    Walnut: 'Slightly bitter and tannic with a dry, woody nuttiness.',
+    Peanut: 'Roasted, savory nuttiness with a creamy, slightly sweet quality.',
+    Cashew: 'Mild, buttery, and creamy. Very smooth and gentle nuttiness.',
+    Macadamia: 'Rich, buttery, and subtly sweet. Luxurious and smooth.',
+    Pecan: 'Sweet, buttery nuttiness with maple and caramel undertones.',
+    Pistachio: 'Slightly sweet, green, and earthy nuttiness. Creamy and distinctive. Increasingly used in Brewers Cup routines.',
+    'Toasted coconut': 'Warm, sweet, tropical nuttiness with caramelised edges. Rich and fragrant.',
+    Praline: 'Caramelised nut confection. Sweet, roasted, and buttery. A polished competition descriptor combining nut and sugar.',
+  },
+  Chocolatey: {
+    _color: '#5d4037',
+    'Dark chocolate': 'Rich, bittersweet cocoa with deep, roasted complexity. Bold and satisfying.',
+    'Milk chocolate': 'Creamy, sweet cocoa with a smooth, mellow warmth.',
+    'White chocolate': 'Buttery, vanilla-forward sweetness with cocoa butter richness.',
+    Cocoa: 'Dry, powdery chocolate. Earthy and slightly bitter, like raw cacao.',
+    'Chocolate fudge': 'Dense, rich, sweet chocolate with a creamy, indulgent quality.',
+    'Cacao nib': 'Raw, bitter, and intensely chocolatey with a crunchy, roasted edge.',
+    'Chocolate ganache': 'Velvety, rich, cream-and-chocolate fusion. Luxurious and smooth. High-end competition descriptor.',
+    'Cacao pulp': 'The sweet, tangy fruit surrounding the cocoa bean. Tropical, tart, and unique. Used in competition to describe fermentation character.',
+    'Bakers chocolate': 'Unsweetened, intense, pure cocoa. Dry and deeply bitter with roasted depth.',
+  },
+  Spicy: {
+    _color: '#d35400',
+    Cinnamon: 'Warm, sweet spice with a woody, aromatic quality. Comforting and familiar.',
+    Clove: 'Pungent, warm, and numbing with a slightly medicinal intensity.',
+    Cardamom: 'Aromatic, citrusy spice with eucalyptus and mint undertones. Complex and exotic.',
+    Ginger: 'Sharp, warming bite with a zesty, peppery quality.',
+    Nutmeg: 'Warm, sweet, slightly woody spice. Subtle and aromatic.',
+    'Black pepper': 'Sharp, biting heat with a dry, pungent finish.',
+    'Star anise': 'Sweet, licorice-like spice with a warm, aromatic depth.',
+    'Pink pepper': 'Not true pepper — aromatic, fruity, and mildly spicy. Delicate with berry-like sweetness. Trendy competition descriptor.',
+    'White pepper': 'Sharp, clean heat without the earthiness of black pepper. Bright and focused.',
+    Turmeric: 'Earthy, warm, slightly bitter spice with a golden, peppery quality.',
+    Saffron: 'Exotic, honey-like spice with metallic and hay-like undertones. Rare and luxurious competition note.',
+    Lemongrass: 'Bright, citrusy herb with a clean, refreshing spice. Used in competition for describing aromatic complexity.',
+  },
+  Roasted: {
+    _color: '#795548',
+    'Toasted bread': 'Warm, yeasty, golden-brown quality. Like fresh toast with butter.',
+    'Dark roast': 'Smoky, carbon-tinged, heavy body. Bold and intense.',
+    'Pipe tobacco': 'Rich, aromatic, slightly sweet smokiness. Leathery and complex.',
+    Smoky: 'Campfire-like, charred quality. Can be pleasant in small amounts.',
+    'Roasted almond': 'Deepened nutty flavour with caramelised, toasty edges.',
+    Malt: 'Biscuit-like, grain sweetness. Like Ovaltine or malted milk.',
+  },
+  'Tea-like': {
+    _color: '#2ecc71',
+    'Black tea': {
+      _color: '#229954',
+      'Earl Grey': 'Bergamot-scented black tea. Citrusy, floral, and aromatic.',
+      Assam: 'Malty, bold, full-bodied black tea with brisk astringency.',
+      Ceylon: 'Bright, citrusy black tea with a clean, crisp finish.',
+      Darjeeling: 'Delicate, muscatel grape-like quality. The "champagne of teas".',
+    },
+    'Green tea': {
+      _color: '#1abc9c',
+      Sencha: 'Grassy, vegetal, slightly sweet with marine undertones.',
+      Matcha: 'Rich, umami, creamy green tea with a vibrant, intense quality.',
+      'Jasmine green': 'Floral, perfumed green tea with sweet jasmine fragrance.',
+    },
+    'Herbal tea': {
+      _color: '#27ae60',
+      Chamomile: 'Soft, honeyed, calming quality with apple-like notes.',
+      Rooibos: 'Naturally sweet, slightly nutty with vanilla and woody notes.',
+      Mint: 'Cool, refreshing, and cleansing. Bright herbal character.',
+    },
+    Oolong: 'Partially oxidised tea — ranges from floral and creamy to toasty and fruity.',
+  },
+  Vegetal: {
+    _color: '#27ae60',
+    'Green / herbal': {
+      _color: '#2ecc71',
+      'Fresh grass': 'Bright, green, just-cut lawn quality. Very fresh and raw.',
+      Basil: 'Aromatic, slightly peppery herb with sweet undertones.',
+      Sage: 'Earthy, slightly camphorous herb with a dry, savoury quality.',
+      'Garden pea': 'Sweet, fresh, green vegetal. Light and springlike.',
+    },
+    Woody: {
+      _color: '#6d4c41',
+      Cedar: 'Aromatic, warm wood with a slightly spicy quality.',
+      Oak: 'Rich, tannic wood with vanilla and caramel undertones.',
+      Sandalwood: 'Creamy, fragrant wood with a sweet, exotic quality.',
+      Pine: 'Resinous, sharp, fresh forest aroma.',
+    },
+  },
+  Sour: {
+    _color: '#f1c40f',
+    'Bright acidity': 'A pleasant, vibrant tartness like biting into a crisp apple. Lifts the cup.',
+    'Wine-like': 'Complex, fermented acidity reminiscent of red or white wine. Adds sophistication.',
+    'Sparkling': 'Effervescent, champagne-like acidity. Tingly and refreshing on the palate.',
+    Vinous: 'Grape-like, rich fermented quality with tannic structure.',
+    Malic: 'Green apple-like tartness. Clean, crisp, and refreshing.',
+    Citric: 'Lemon/lime-like acidity. Bright, juicy, and mouth-watering.',
+    Tartaric: 'Grape-like acidity found in wine. Sharp but structured.',
+    Phosphoric: 'Cola-like acidity — sharp but sweet. Found in some Kenyan coffees. Prized in competition for its unique sparkling quality.',
+    Lactic: 'Soft, creamy, yoghurt-like acidity. Gentle and rounded. Common in washed and anaerobic coffees described in competition.',
+    Acetic: 'Vinegar-like sharpness. In small amounts adds complexity (like balsamic). Too much is a defect.',
+  },
+  Fermented: {
+    _color: '#9b59b6',
+    Winey: 'Rich, boozy, red-wine quality with deep fruit and tannic structure.',
+    Boozy: 'Alcohol-like warmth and sweetness — rum, brandy, or whisky notes.',
+    'Overripe fruit': 'Intensely sweet with a slightly funky, fermented edge.',
+    Kombucha: 'Tangy, vinegary, effervescent quality with sweet-sour balance.',
+    Yoghurt: 'Tangy, creamy, lactic fermentation. Smooth and probiotic.',
+    'Natural wine': 'Funky, complex, fruit-forward with organic, earthy undertones. Competition descriptor for experimental naturals.',
+    Sake: 'Clean, rice-wine fermentation. Smooth, umami-tinged, with a delicate alcohol quality. Used for describing clean anaerobic profiles.',
+    Mead: 'Honey-wine quality. Sweet, floral fermentation with a warming, boozy depth.',
+    Balsamic: 'Aged vinegar-like complexity. Sweet, tart, syrupy, and complex. A sophisticated competition descriptor.',
+    Champagne: 'Effervescent, yeasty, celebratory quality. Bright, toasty, and sparkling. Used to describe the finest, most complex acidities in competition.',
+  },
+  Cereal: {
+    _color: '#bfa46f',
+    'Graham cracker': 'Sweet, honeyed, toasted wheat. Warm and biscuit-like.',
+    Oat: 'Creamy, mild grain sweetness. Smooth and comforting.',
+    Wheat: 'Clean, bready grain character. Neutral and balanced.',
+    Barley: 'Toasty, malt-like grain. Slightly sweet and earthy.',
+    Rice: 'Delicate, clean, neutral grain. Very subtle sweetness.',
+  },
+  'By Color': {
+    _color: '#666',
+    Red: {
+      _color: '#e74c3c',
+      'Red candy': 'Bright, pure sweet-sour like cherry candy or red skittles.',
+      'Red fruits': 'Strawberry, raspberry, red apple — bright and juicy.',
+      'Red spice': 'Cinnamon, clove, red chilli — warm and peppery.',
+    },
+    Purple: {
+      _color: '#9b59b6',
+      'Purple fruit': 'Grape, blackberry, plum — deep and wine-like.',
+      'Purple spice': 'Cardamom, nutmeg, star anise — aromatic and complex.',
+      'Purple flower': 'Lavender, hibiscus — floral and slightly tart.',
+    },
+    Orange: {
+      _color: '#e67e22',
+      'Orange fruit': 'Orange peel, apricot, mango — bright and sweet.',
+      'Orange spice': 'Cinnamon, ginger, turmeric — warm and woody.',
+      'Orange caramel': 'Butterscotch, toffee — buttery and rich.',
+    },
+    Yellow: {
+      _color: '#f1c40f',
+      'Yellow fruit': 'Banana, pineapple, lemon — tropical or citrusy.',
+      'Yellow honey': 'Wildflower honey, golden syrup — sweet and aromatic.',
+      'Yellow grain': 'Wheat, oat, cereal — clean and toasted.',
+    },
+    Green: {
+      _color: '#27ae60',
+      'Green fruit': 'Green apple, kiwi, honeydew — crisp and fresh.',
+      'Green herb': 'Mint, basil, grass — herbal and vibrant.',
+      'Green tea': 'Sencha, matcha, jasmine — grassy and floral.',
+    },
+    Brown: {
+      _color: '#8d6e63',
+      'Brown nut': 'Almond, hazelnut, walnut — creamy or toasty.',
+      'Brown chocolate': 'Dark chocolate, cocoa, cacao nib — rich and earthy.',
+      'Brown spice': 'Clove, cinnamon, nutmeg — warm and complex.',
+    },
+  },
+};
+
+/* ── Acidity Guide (Competition Practice) ── */
+const ACIDITY_GUIDE = {
+  _colors: { 'By Type':'#f39c12', 'By Quality':'#27ae60', 'By Intensity':'#e74c3c', 'By Origin':'#3d7ce0' },
+  'By Type': {
+    _color: '#f39c12',
+    Citric: {
+      _color: '#f39c12',
+      Lemon: 'Bright, sharp, zesty. The most classic citric reference. Clean and cutting.',
+      Lime: 'Sharper than lemon with a green, electric zing. Very bright and lively.',
+      Orange: 'Sweeter citric. Round, juicy, warm acidity. Less sharp, more approachable.',
+      Grapefruit: 'Bittersweet citric with a pithy, tangy edge. Complex and layered.',
+      'Blood orange': 'Deep citric with berry undertones. Rich, sweet-tart, and complex.',
+      Tangerine: 'Light, candy-sweet citric. Aromatic and delicate.',
+      Yuzu: 'Floral, fragrant citrus. Bright but elegant — like lemon meets mandarin.',
+      Kumquat: 'Intense, concentrated citric with a bitter peel finish. Bold.',
+    },
+    Malic: {
+      _color: '#7cb342',
+      'Green apple': 'Crisp, tart, snappy. The classic malic reference. Clean and refreshing.',
+      'Red apple': 'Softer, sweeter malic. Rounder and less sharp than green apple.',
+      Pear: 'Delicate, gentle malic acidity. Soft and subtle — barely tart.',
+      Rhubarb: 'Sharp, tangy malic with a vegetal edge. Tart and complex.',
+      'Kiwi fruit': 'Bright, tropical malic. Sweet-tart with a fuzzy texture quality.',
+      Plum: 'Rich malic with depth. Sweet-sour and wine-like.',
+    },
+    Tartaric: {
+      _color: '#9b59b6',
+      'Red grape': 'Rich, wine-like tartaric. Tannic structure with fruit depth.',
+      'White grape': 'Lighter, crisper tartaric. Clean and delicate with a dry finish.',
+      Cranberry: 'Sharp, dry tartaric. Tart and astringent with a clean bite.',
+      Pomegranate: 'Complex, jewel-like tartaric. Tangy, deep, and layered.',
+      'Red wine': 'Full, tannic tartaric. Boozy, structured, and complex.',
+      'White wine': 'Crisp, mineral tartaric. Clean, dry, and elegant.',
+      Tamarind: 'Sweet-sour tartaric with a sticky, date-like complexity.',
+    },
+    Phosphoric: {
+      _color: '#e74c3c',
+      Cola: 'Sweet, sparkling acidity. The classic phosphoric reference. Bright but smooth.',
+      'Sparkling water': 'Clean, effervescent tingle. Acidity without fruit — pure sparkle.',
+      Champagne: 'Elegant, fine bubbles of acidity. Celebratory and refined.',
+      Blackcurrant: 'Intense, deep, sweet-tart. Classic Kenyan descriptor. Rich and concentrated.',
+      'Tropical punch': 'Sweet, mixed-fruit phosphoric. Bright and candy-like.',
+    },
+    Lactic: {
+      _color: '#3498db',
+      Yoghurt: 'Creamy, tangy acidity. Smooth and thick with a cultured quality.',
+      Buttermilk: 'Tangy, slightly sour creaminess. Adds body and richness to the cup.',
+      'Cream cheese': 'Mild, rich lactic. Subtle tang with a heavy, coating quality.',
+      Kefir: 'Fizzy, fermented lactic. Tangy with a probiotic complexity.',
+      'Sour cream': 'Rich, thick tang. Smooth and mild — rounds out the cup.',
+    },
+    Acetic: {
+      _color: '#e67e22',
+      Balsamic: 'Complex, aged vinegar quality. Sweet-sour with depth. Can be positive in small amounts.',
+      'Apple cider vinegar': 'Fruity, sharp tang. Fermented apple quality. Bright and punchy.',
+      'Wine vinegar': 'Sharp, boozy tang. Thin and cutting. Usually a defect if dominant.',
+      Kombucha: 'Fizzy, fermented tang. Sweet-sour with a funky, living quality.',
+    },
+    Quinic: {
+      _color: '#795548',
+      'Bitter finish': 'Dry, astringent aftertaste. Like over-steeped black tea. Over-extraction.',
+      'Dry tannin': 'Puckering, drying sensation like unripe banana peel or grape skin.',
+      'Woody bitter': 'Bark-like, dry bitterness. Earthy and lingering.',
+    },
+    Chlorogenic: {
+      _color: '#607d8b',
+      'Raw / green': 'Harsh, grassy, unpleasant sharpness. Tastes under-developed.',
+      Astringent: 'Tight, puckering, unripe quality. Makes the mouth feel stripped and dry.',
+      Metallic: 'Tin-like, chemical sharpness. Cold and unpleasant. Extraction defect.',
+    },
+  },
+  'By Quality': {
+    _color: '#27ae60',
+    Bright: 'Clean, clear, and uplifting. Like sunshine in a cup. Enhances the overall experience.',
+    Juicy: 'Mouth-watering and succulent. Makes you salivate. Hallmark of great washed African coffees.',
+    Sparkling: 'Effervescent and champagne-like. Tingly and refreshing. Sign of excellent quality.',
+    Crisp: 'Clean and defined. Like biting into a fresh apple. No muddiness.',
+    Round: 'Spreads evenly across the palate. Balanced and pleasant. Enveloping and soft.',
+    Vibrant: 'Electric, alive, and dynamic. The acidity demands attention.',
+    Delicate: 'Gentle, subtle acidity. Present but not dominant. Tea-like.',
+    Sour: 'Unpleasant, vinegary sharpness. Overwhelms other flavours. Under-extraction or defect.',
+    Flat: 'Acidity is missing entirely. Dull, lifeless, boring. Over-extraction or stale beans.',
+    Astringent: 'Puckering, drying sensation. Tight and uncomfortable. Under-extraction or over-roasting.',
+  },
+  'By Intensity': {
+    _color: '#e74c3c',
+    Low: 'Barely noticeable. Smooth and mellow. Common in Brazilian, Indonesian, and dark roasts.',
+    Medium: 'Noticeable but balanced. Adds brightness without dominating. The sweet spot.',
+    'Medium-high': 'Prominent and bright. Clearly defines the cup character. Washed Central Americans.',
+    High: 'Very prominent. Dominates the cup. Common in Kenyan, Ethiopian, and light roasts.',
+    'Very high': 'Intense and electric. Can be overwhelming if not balanced by sweetness.',
+  },
+  'By Origin': {
+    _color: '#3d7ce0',
+    Kenya: 'Phosphoric + citric. Intense, blackcurrant-like. Sparkling and electric. High acidity with a sweet finish.',
+    'Ethiopia (washed)': 'Citric + malic. Bright, floral, and tea-like. Delicate with jasmine or bergamot qualities.',
+    'Ethiopia (natural)': 'Lactic + tartaric. Fruit-forward with wine-like, fermented quality. Blueberry, strawberry.',
+    Colombia: 'Citric + malic. Balanced and clean. Classic coffee acidity — reliable and pleasant.',
+    Guatemala: 'Malic + citric. Apple-like with chocolate undertones. Balanced but noticeable.',
+    'Costa Rica': 'Citric + tartaric. Clean, bright, and honey-sweet. Well-balanced with fruit notes.',
+    Brazil: 'Low citric. Muted acidity, nutty and chocolatey. Smooth and easy drinking.',
+    Indonesia: 'Low quinic. Earthy with very low acidity. Full body compensates for lack of brightness.',
+    Panama: 'Citric + malic. Clean, complex, floral. Especially Gesha — jasmine and bergamot acidity.',
+    'El Salvador': 'Malic + citric. Soft, balanced, stone fruit acidity. Approachable and sweet.',
+  },
+};
+
+/* ── Sweetness Guide (Competition Practice) ── */
+const SWEETNESS_GUIDE = {
+  _colors: { 'By Type':'#f5a623', 'By Quality':'#27ae60', 'By Intensity':'#e74c3c' },
+  'By Type': {
+    _color: '#f5a623',
+    Caramel: {
+      _color: '#d4813c',
+      Toffee: 'Buttery, chewy caramel. Rich and slightly bitter at the edges. Warm and indulgent.',
+      Butterscotch: 'Buttery, vanilla-tinged caramel. Smoother and sweeter than toffee.',
+      'Burnt sugar': 'Dark, smoky caramel edge. Bittersweet — adds complexity. Like crème brûlée.',
+      'Dulce de leche': 'Milky, condensed caramel. Creamy, thick, and intensely sweet.',
+      'Caramel sauce': 'Smooth, pourable caramel. Classic, clean, and universally recognisable.',
+      'Salted caramel': 'Sweet-salty caramel. The salt enhances and complicates the sweetness.',
+      'Crème brûlée': 'Custard + torched sugar. Creamy base with a crackling caramel top note.',
+    },
+    Honey: {
+      _color: '#f5a623',
+      'Wildflower honey': 'Complex, aromatic. Multi-floral with herbal and fruity notes. Deep.',
+      'Clover honey': 'Clean, mild, straightforward sweetness. Light and delicate.',
+      'Manuka honey': 'Bold, earthy, slightly medicinal. Rich with herbal depth.',
+      Honeycomb: 'Waxy, rich honey with a beeswax complexity. Thick and aromatic.',
+      'Acacia honey': 'Light, floral, almost transparent sweetness. Very delicate and clean.',
+      'Buckwheat honey': 'Dark, malty, molasses-like honey. Bold and earthy.',
+    },
+    Fruit: {
+      _color: '#e74c3c',
+      'Tropical fruit': {
+        _color: '#e84393',
+        'Ripe mango': 'Lush, perfumed, creamy sweetness. Intensely tropical.',
+        Pineapple: 'Bright, tangy sweetness with a fermented edge.',
+        Passionfruit: 'Intense, aromatic, sweet-tart. Complex and exotic.',
+        Papaya: 'Soft, musky tropical sweetness. Creamy and mild.',
+        Lychee: 'Perfumed, grape-like sweetness. Delicate and floral.',
+      },
+      'Stone fruit': {
+        _color: '#d4513a',
+        'Ripe peach': 'Soft, velvety, juicy sweetness. Delicate and summery.',
+        'Apricot jam': 'Concentrated, cooked stone fruit sweetness. Thick and bright.',
+        Cherry: 'Can be sweet (maraschino) or tart (morello). Versatile and common.',
+        Nectarine: 'Snappy, bright stone fruit. Sweeter and more acidic than peach.',
+      },
+      Berry: {
+        _color: '#c0392b',
+        'Strawberry jam': 'Cooked, concentrated berry sweetness. Warm and nostalgic.',
+        Blueberry: 'Deep, jammy, wine-like sweetness. Classic natural Ethiopian note.',
+        Raspberry: 'Bright, tangy berry sweetness. Vibrant and sparkling.',
+        Blackberry: 'Dark, rich, earthy berry sweetness. Bold and tannic.',
+      },
+      'Dried fruit': {
+        _color: '#a0522d',
+        Raisin: 'Concentrated grape sweetness. Wine-like and caramelised.',
+        Date: 'Deep, sticky, toffee-like sweetness. Rich and dense.',
+        Fig: 'Earthy, jammy sweetness with a seedy complexity.',
+        'Dried apricot': 'Tangy, concentrated stone fruit sweetness.',
+        'Dried mango': 'Chewy, tropical, caramelised sweetness.',
+      },
+    },
+    Chocolate: {
+      _color: '#5d4037',
+      'Milk chocolate': 'Creamy, smooth, mellow cocoa sweetness. Comforting and approachable.',
+      'Dark chocolate': 'Bittersweet, rich, deep cocoa. Complex with roasted undertones.',
+      'White chocolate': 'Buttery, vanilla-forward. Cocoa butter richness without bitterness.',
+      'Cocoa powder': 'Dry, earthy, powdery chocolate. Subtle and slightly bitter.',
+      'Chocolate fudge': 'Dense, rich, indulgent chocolate sweetness. Thick and satisfying.',
+      Mocha: 'Coffee-chocolate marriage. Roasted and sweet simultaneously.',
+      'Cacao nib': 'Raw, intense, bitter-sweet chocolate. Crunchy and primal.',
+    },
+    'Brown sugar': {
+      _color: '#8d6e63',
+      Molasses: 'Deep, dark, bittersweet. Thick and syrupy with rum-like depth.',
+      Muscovado: 'Raw, unrefined. Toffee and rum notes. Complex and earthy.',
+      Demerara: 'Coarse, crunchy, golden sweetness. Clean with light caramel.',
+      Panela: 'Unrefined cane sugar. Complex — molasses, rum, dried fruit notes.',
+      Piloncillo: 'Mexican unrefined sugar. Smoky, earthy, with cinnamon undertones.',
+      Jaggery: 'Indian unrefined sugar. Deep, earthy, with date-like complexity.',
+      Treacle: 'Dark, sticky, intensely bittersweet. Like dark molasses with a bitter edge.',
+      'Golden syrup': 'Light, buttery, clean sweetness. Smooth and pourable.',
+    },
+    Floral: {
+      _color: '#e984c9',
+      'Rose water': 'Perfumed, delicate, romantic sweetness. Aromatic and elegant.',
+      'Orange blossom': 'Sweet, citrusy floral. Light and refreshing — like neroli oil.',
+      Jasmine: 'Intensely perfumed, heady sweetness. Exotic and aromatic.',
+      Lavender: 'Herbal, calming sweetness. Slightly camphorous.',
+      Elderflower: 'Muscat grape-like, delicate floral sweetness.',
+    },
+    Vanilla: {
+      _color: '#f0d58c',
+      'Vanilla bean': 'Rich, aromatic, complex vanilla. Seeds and pod — warm and deep.',
+      'Vanilla extract': 'Pure, clean vanilla sweetness. Slightly boozy and intense.',
+      'Vanilla custard': 'Creamy, eggy, rich vanilla. Thick and indulgent.',
+      'Vanilla ice cream': 'Cold, creamy, mellow vanilla. Smooth and comforting.',
+    },
+    Candy: {
+      _color: '#ff69b4',
+      'Cotton candy': 'Airy, pure sugar. Light and delicate — melts on the tongue.',
+      'Hard candy': 'Concentrated, clear sweetness. Bright and long-lasting.',
+      'Caramel candy': 'Chewy, buttery candy sweetness. Warm and sticky.',
+      'Fruit candy': 'Artificial-bright fruit sweetness. Punchy and recognisable.',
+      Marshmallow: 'Soft, pillowy, vanilla-tinged sweetness. Gentle and airy.',
+      Nougat: 'Nutty, chewy, honey-bound sweetness. Dense and complex.',
+    },
+    Grain: {
+      _color: '#bfa46f',
+      Malt: 'Biscuit-like grain sweetness. Like Ovaltine or malted milk. Toasty.',
+      'Graham cracker': 'Sweet, honeyed wheat. Warm and biscuit-like.',
+      'Digestive biscuit': 'Wholesome, buttery, mildly sweet grain. Comforting.',
+      'Oat milk': 'Creamy, naturally sweet grain. Smooth and mild.',
+      'Cereal milk': 'The sweet milk left after cereal. Nostalgic grain sweetness.',
+    },
+  },
+  'By Quality': {
+    _color: '#27ae60',
+    Clean: 'Pure, transparent sweetness. No off-flavours hiding behind it. Like refined sugar in water.',
+    Complex: 'Multi-layered sweetness that changes as you taste. Starts caramel, evolves to fruit, finishes honey.',
+    Resolving: 'Sweetness that emerges as the cup cools. A hallmark of great coffee — reveals itself over time.',
+    Syrupy: 'Thick, viscous sweetness that coats the palate. Like maple syrup or golden syrup.',
+    Lingering: 'Sweetness persists long after swallowing. The aftertaste is sweet. A sign of quality.',
+    Delicate: 'Whisper of sweetness. Subtle and refined — you have to look for it.',
+    'Dry sweet': 'Sweetness present but not wet. Like dried fruit vs fresh fruit.',
+    Cloying: 'Overly sweet and sticky. Feels artificial or unbalanced. Negative.',
+    Absent: 'No sweetness detected. Cup feels hollow, bitter, or astringent. Defect or over-extraction.',
+  },
+  'By Intensity': {
+    _color: '#e74c3c',
+    Low: 'Barely there. The cup is more savoury or acidic. Subtle and understated.',
+    'Low-medium': 'Hints of sweetness. Present but not a defining characteristic.',
+    Medium: 'Clearly present and balanced. Sweetness is one element among many.',
+    'Medium-high': 'Sweetness is prominent. One of the first things you notice.',
+    High: 'Sweetness dominates. Rich, intense, and saturating.',
+    'Very high': 'Intensely sweet. Syrupy and enveloping. Rare — usually natural-processed.',
+  },
+};
+
+const TEXTURE_WHEEL = {
+  _colors: { Body:'#795548', Mouthfeel:'#3498db', Finish:'#9b59b6', Weight:'#e67e22', Temperature:'#e74c3c' },
+  Body: {
+    _color: '#795548',
+    'Tea-like': 'Very light, thin, and clean. Almost watery but pleasant — like sipping a delicate tea.',
+    Light: 'Thin and clean on the palate. Easy to drink, refreshing. Like skim milk in weight.',
+    Medium: 'Balanced weight on the tongue. Satisfying without being heavy. Like whole milk.',
+    Full: 'Heavy, rich, and coating. Fills the mouth completely. Like cream.',
+    Syrupy: 'Thick, viscous, and sticky. Clings to the palate with intense richness. Like maple syrup.',
+  },
+  Mouthfeel: {
+    _color: '#3498db',
+    Juicy: 'Mouth-watering, succulent quality that makes you salivate. Like biting into ripe fruit — wet, vibrant, and lively.',
+    Silky: 'Incredibly smooth, gliding texture. No rough edges — like liquid silk on the palate.',
+    Creamy: 'Rich, velvety, and coating. Feels like cream or melted butter in the mouth.',
+    Buttery: 'Smooth and rich with an oily, luxurious quality. Coats the tongue with warmth.',
+    Velvety: 'Soft, plush, and smooth with a gentle, cushioned feel on the palate.',
+    Crisp: 'Clean, sharp, and defined. Each sip feels precise and refreshing, like a crisp apple.',
+    Dry: 'Astringent, tannic quality that removes moisture from the mouth. Like strong black tea.',
+    'Chalky': 'Powdery, slightly gritty texture that coats the mouth. Can indicate under-extraction.',
+    Round: 'Smooth, balanced, and complete. No sharp edges — everything is in harmony.',
+    Sparkling: 'Effervescent, tingly quality on the tongue. Lively and refreshing.',
+    Astringent: 'Puckering, drying sensation. The mouth feels tight and dry, like unripe banana peel.',
+    Clean: 'No residual flavours or textures left behind. Pure and transparent.',
+    Coating: 'Leaves a pleasant film on the palate. The flavour wraps around your mouth. Desirable fullness in competition.',
+    Syrupy: 'Thick, viscous, and clinging. Like honey or maple syrup coating the tongue. Indicates high sweetness and extraction.',
+    Waxy: 'Smooth, candle-like coating quality. Neither dry nor wet — unique and luxurious.',
+    Effervescent: 'Lively, fizzy, champagne-like sensation. The coffee feels alive and dancing on the palate.',
+    Structured: 'The coffee has clear layers and definition. Each quality is distinct and organised. Hallmark of a competition-winning cup.',
+    Complex: 'Multiple textures coexist — shifting from one to another as you drink. Layers unfold over time.',
+    Transparent: 'The texture doesn\'t interfere with flavour — you taste through it clearly. A sign of exceptional brewing.',
+  },
+  Finish: {
+    _color: '#9b59b6',
+    Short: 'Flavour disappears quickly after swallowing. Clean but may feel incomplete.',
+    Medium: 'Flavour lingers pleasantly for a moderate time. Balanced and satisfying.',
+    Long: 'Flavour persists and evolves after swallowing. Complex and rewarding — a hallmark of great coffee.',
+    'Lingering sweetness': 'A sweet aftertaste that stays and slowly fades. Highly desirable and comforting.',
+    'Dry finish': 'The aftertaste leaves a drying, tannic sensation. Can be pleasant with dark chocolatey coffees.',
+    'Clean finish': 'Nothing left on the palate after swallowing. Transparent and crisp.',
+    'Fruity aftertaste': 'Fruit flavours that emerge or persist after the sip. Delightful and complex.',
+    'Evolving finish': 'The aftertaste changes and develops over time — new notes appear minutes later. The mark of exceptional coffee in competition.',
+    'Sweet fade': 'Flavours gently recede into a clean, sweet whisper. Beautiful and refined.',
+    'Warming finish': 'A gentle, spicy warmth that builds after swallowing. Comforting and complex.',
+  },
+  Weight: {
+    _color: '#e67e22',
+    Delicate: 'Barely-there presence on the tongue. Ethereal and fleeting.',
+    Balanced: 'Neither too light nor too heavy. Just right — satisfying without overwhelming.',
+    Dense: 'Concentrated and thick. Packed with flavour and substance.',
+    Heavy: 'Very weighty on the palate. Rich, intense, and sometimes overwhelming.',
+  },
+  Temperature: {
+    _color: '#e74c3c',
+    'Hot characteristics': 'Initial high-temp flavours — acidity is brighter, sweetness less apparent, aromatics most volatile.',
+    'Warm characteristics': 'The sweet spot — sweetness peaks, acidity balances, and complexity emerges as the cup cools.',
+    'Cool characteristics': 'As coffee cools, new flavours reveal themselves. Great coffees gain complexity; poor ones lose appeal.',
+    'Room temp': 'The ultimate test of quality. Exceptional coffees remain sweet and complex even at room temperature.',
+  },
+};
+
+const _fwState = { path: [] };
+const _twState = { path: [] };
+const _awState = { path: [] };
+const _swState = { path: [] };
+
+function renderWheel(containerId, data, state) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+
+  let node = data;
+  const rootNames = { flavourWheel:'Flavour', textureWheel:'Texture', acidityWheel:'Acidity', sweetnessWheel:'Sweetness' };
+  const crumbs = [rootNames[containerId] || 'Guide'];
+  for (const key of state.path) {
+    if (node[key] && typeof node[key] === 'object') {
+      node = node[key];
+      crumbs.push(key);
+    } else break;
+  }
+
+  let html = '';
+
+  /* breadcrumb */
+  if (state.path.length > 0) {
+    html += '<div class="wheel-breadcrumb">';
+    crumbs.forEach((c, i) => {
+      if (i > 0) html += '<span class="wheel-crumb-sep">›</span>';
+      if (i < crumbs.length - 1) {
+        html += `<span class="wheel-crumb" onclick="wheelNav('${containerId}',${i})">${esc(c)}</span>`;
+      } else {
+        html += `<span class="wheel-crumb">${esc(c)}</span>`;
+      }
+    });
+    html += '</div>';
+  }
+
+  html += '<div class="wheel-grid">';
+  const parentColor = node._color || '#888';
+  const colorMap = data._colors || {};
+
+  const keys = Object.keys(node).filter(k => !k.startsWith('_'));
+  for (const key of keys) {
+    const val = node[key];
+    const chipColor = (typeof val === 'object' && val._color) ? val._color : (colorMap[key] || parentColor);
+    const isLeaf = typeof val === 'string';
+
+    if (isLeaf) {
+      html += `<div class="wheel-chip" style="background:${chipColor}18;color:${chipColor};border:1px solid ${chipColor}30" onclick="wheelInfo('${containerId}','${esc(key).replace(/'/g,"\\'")}')">
+        ${esc(key)}
+        <span class="wheel-info-btn" style="background:${chipColor}30;color:${chipColor}">i</span>
+      </div>`;
+    } else {
+      const count = Object.keys(val).filter(k => k !== '_color').length;
+      html += `<div class="wheel-chip" style="background:${chipColor}18;color:${chipColor};border:1px solid ${chipColor}30" onclick="wheelDrill('${containerId}','${esc(key).replace(/'/g,"\\'")}')">
+        ${esc(key)}<br><span style="font-size:11px;opacity:.7">${count} notes</span>
+      </div>`;
+    }
+  }
+  html += '</div>';
+
+  /* info panel */
+  if (state.infoKey) {
+    const desc = node[state.infoKey];
+    if (typeof desc === 'string') {
+      const chipColor = parentColor;
+      html += `<div class="wheel-info" style="border-left:4px solid ${chipColor}">
+        <strong>${esc(state.infoKey)}</strong><br>${esc(desc)}
+      </div>`;
+    }
+  }
+
+  el.innerHTML = html;
+}
+
+function _wheelLookup(cid) {
+  const map = {
+    flavourWheel:   { state: _fwState, data: FLAVOUR_WHEEL },
+    textureWheel:   { state: _twState, data: TEXTURE_WHEEL },
+    acidityWheel:   { state: _awState, data: ACIDITY_GUIDE },
+    sweetnessWheel: { state: _swState, data: SWEETNESS_GUIDE },
+  };
+  return map[cid] || map.flavourWheel;
+}
+
+function wheelDrill(cid, key) {
+  const { state, data } = _wheelLookup(cid);
+  state.path.push(key);
+  state.infoKey = null;
+  renderWheel(cid, data, state);
+}
+
+function wheelNav(cid, idx) {
+  const { state, data } = _wheelLookup(cid);
+  state.path = state.path.slice(0, idx);
+  state.infoKey = null;
+  renderWheel(cid, data, state);
+}
+
+function wheelInfo(cid, key) {
+  if (typeof event !== 'undefined' && event) event.stopPropagation();
+  const { state, data } = _wheelLookup(cid);
+  state.infoKey = state.infoKey === key ? null : key;
+  renderWheel(cid, data, state);
+}
+
+function guideSearch() {
+  const query = document.getElementById('guideSearch').value.toLowerCase().trim();
+  const resultsEl = document.getElementById('guideSearchResults');
+
+  if (!query) {
+    resultsEl.style.display = 'none';
+    return;
+  }
+
+  /* build search index from all flavor notes */
+  const searchIndex = [];
+
+  function indexNotes(node, path = []) {
+    const keys = Object.keys(node).filter(k => k !== '_color' && k !== '_colors');
+    for (const key of keys) {
+      const val = node[key];
+      if (typeof val === 'string') {
+        searchIndex.push({
+          note: key,
+          path: [...path, key],
+          desc: val,
+        });
+      } else if (typeof val === 'object') {
+        indexNotes(val, [...path, key]);
+      }
+    }
+  }
+
+  indexNotes(FLAVOUR_WHEEL);
+  indexNotes(ACIDITY_GUIDE, ['Acidity']);
+  indexNotes(SWEETNESS_GUIDE, ['Sweetness']);
+
+  /* search */
+  const matches = searchIndex.filter(item => {
+    const noteMatch = item.note.toLowerCase().includes(query);
+    const descMatch = item.desc.toLowerCase().includes(query);
+    return noteMatch || descMatch;
+  });
+
+  /* render results */
+  if (!matches.length) {
+    resultsEl.innerHTML = '<div style="color:var(--text3);font-size:15px;text-align:center;padding:12px 0">No flavor notes match that description</div>';
+    resultsEl.style.display = 'block';
+    return;
+  }
+
+  resultsEl.innerHTML = matches.slice(0, 8).map(m => {
+    const pathStr = m.path.slice(0, -1).join(' › ');
+    const pathHtml = pathStr ? `<div style="font-size:13px;color:var(--text3);margin-bottom:4px">${esc(pathStr)}</div>` : '';
+    return `<div style="border:1px solid var(--sep);border-radius:10px;padding:12px;margin-bottom:8px">
+      ${pathHtml}
+      <div style="font-weight:600;color:var(--text);margin-bottom:4px">${esc(m.note)}</div>
+      <div style="font-size:13px;color:var(--text3);line-height:1.4">${esc(m.desc)}</div>
+    </div>`;
+  }).join('');
+
+  resultsEl.style.display = 'block';
+}
+
+/* ──────────────────────────────────────────────────────────────
+   Excel export
+────────────────────────────────────────────────────────────── */
+function exportXLSX() {
+  if (typeof XLSX === 'undefined') { showToast('SheetJS not loaded'); return; }
+
+  const wb = XLSX.utils.book_new();
+
+  /* helper: build sheet with auto col widths + frozen header row */
+  function addSheet(name, rows, opts) {
+    if (!rows.length) { const ws = XLSX.utils.aoa_to_sheet([['No data']]); XLSX.utils.book_append_sheet(wb, ws, name); return; }
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const keys = Object.keys(rows[0]);
+    /* auto-fit column widths */
+    ws['!cols'] = keys.map(k => {
+      let max = k.length;
+      rows.forEach(r => { const v = String(r[k] ?? ''); if (v.length > max) max = v.length; });
+      return { wch: Math.min(max + 3, 45) };
+    });
+    /* freeze header row */
+    ws['!freeze'] = { xSplit: 0, ySplit: 1 };
+    /* autofilter on all columns */
+    ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s: {r:0,c:0}, e: {r:rows.length, c:keys.length-1} }) };
+    XLSX.utils.book_append_sheet(wb, ws, name);
+  }
+
+  /* ── 1. BREW LOG (sorted newest first) ── */
+  const sortedBrews = [...brews].sort((a,b) => (b.date||'').localeCompare(a.date||''));
+  const brewRows = sortedBrews.map((b, i) => {
+    const bean = beans.find(bn => bn.id === b.beanId);
+    const dor = getDOR(bean, b);
+    const ratio = (b.dose && b.water) ? +(b.water / b.dose).toFixed(1) : '';
+    return {
+      '#': i + 1,
+      'Date': b.date || '',
+      'Bean': bean ? bdn(bean) : '',
+      'Roaster': bean?.roaster || '',
+      'Region': bean?.farm || '',
+      'Varietal': bean?.varietal || '',
+      'Processing': bean?.processing || '',
+      'Days Off Roast': dor != null ? dor : '',
+      'Frozen': b.frozen ? 'Yes' : 'No',
+      'Dose (g)': num(b.dose),
+      'Water (g)': num(b.water),
+      'Ratio': ratio,
+      'Temp (°C)': num(b.temp),
+      'Grind': b.grind || '',
+      'Bloom (s)': num(b.bloom),
+      'Total Time': b.totalTime || '',
+      'Bev Weight (g)': num(b.beverageWeight),
+      'TDS (%)': num(b.tds),
+      'EY (%)': num(b.ey),
+      'Brewer': b.brewer || '',
+      'Grinder': b.grinder || '',
+      'Filter': b.filter || '',
+      'Aroma Intensity (1-9)': num(b.aroma?.intensity),
+      'Aroma Notes': b.aroma?.notes || '',
+      'Hot Acidity (1-9)': num(b.hot?.acidity),
+      'Hot Sweetness (1-9)': num(b.hot?.sweetness),
+      'Hot Bitterness (1-9)': num(b.hot?.bitterness),
+      'Hot Tasting Notes': b.hot?.notes || '',
+      'Cool Acidity (1-9)': num(b.cool?.acidity),
+      'Cool Sweetness (1-9)': num(b.cool?.sweetness),
+      'Cool Bitterness (1-9)': num(b.cool?.bitterness),
+      'Cool Tasting Notes': b.cool?.notes || '',
+      'Overall Score (/10)': num(b.score),
+      'Recipe & Thoughts': b.notes || '',
+      'Adjustments': b.adjust || '',
+    };
+  });
+  addSheet('Brew Log', brewRows);
+
+  /* ── 2. BEAN LIBRARY ── */
+  const beanRows = beans.map(b => {
+    const bBrews = brews.filter(br => br.beanId === b.id);
+    const scored = bBrews.filter(br => br.score != null);
+    const eyVals = bBrews.filter(br => br.ey != null);
+    return {
+      Roaster: b.roaster || '',
+      Region: b.farm || '',
+      Processing: b.processing || '',
+      Varietal: b.varietal || '',
+      Other: b.other || '',
+      'Roast Date': b.roastDate || '',
+      'Frozen At Day': b.frozenDay != null ? b.frozenDay : '',
+      'Total Brews': bBrews.length,
+      'Avg Score': scored.length ? +(scored.reduce((a,c) => a + c.score, 0) / scored.length).toFixed(1) : '',
+      'Best Score': scored.length ? Math.max(...scored.map(s => s.score)) : '',
+      'Avg EY (%)': eyVals.length ? +(eyVals.reduce((a,c) => a + c.ey, 0) / eyVals.length).toFixed(1) : '',
+      'Best EY (%)': eyVals.length ? +(Math.max(...eyVals.map(e => e.ey))).toFixed(1) : '',
+      'Best Recipe': (() => {
+        const best = scored.sort((a,b) => b.score - a.score)[0];
+        if (!best) return '';
+        return [best.dose+'g', best.water+'g', best.temp?best.temp+'°':'', best.grind, best.totalTime].filter(Boolean).join(' / ');
+      })(),
+    };
+  });
+  addSheet('Bean Library', beanRows);
+
+  /* ── 3. PER-BEAN BREAKDOWN (each bean's brews grouped) ── */
+  const breakdownRows = [];
+  beans.forEach(bean => {
+    const bBrews = sortedBrews.filter(b => b.beanId === bean.id);
+    if (!bBrews.length) return;
+    bBrews.forEach(b => {
+      const dor = getDOR(bean, b);
+      breakdownRows.push({
+        Bean: bdn(bean),
+        Roaster: bean.roaster || '',
+        Date: b.date || '',
+        'Days Off Roast': dor != null ? dor : '',
+        'Dose (g)': num(b.dose),
+        'Water (g)': num(b.water),
+        'Ratio': (b.dose && b.water) ? +(b.water/b.dose).toFixed(1) : '',
+        'Temp (°C)': num(b.temp),
+        'Grind': b.grind || '',
+        'Total Time': b.totalTime || '',
+        'TDS (%)': num(b.tds),
+        'EY (%)': num(b.ey),
+        'Score (/10)': num(b.score),
+        'Notes': b.notes || '',
+        'Adjustments': b.adjust || '',
+      });
+    });
+  });
+  addSheet('Per-Bean Breakdown', breakdownRows);
+
+  /* ── 4. SUMMARY DASHBOARD ── */
+  const scores = brews.filter(b => b.score != null).map(b => b.score);
+  const eys = brews.filter(b => b.ey != null).map(b => b.ey);
+  const topBean = (() => {
+    let best = null, bestAvg = 0;
+    beans.forEach(bn => {
+      const s = brews.filter(b => b.beanId === bn.id && b.score != null);
+      if (s.length >= 1) { const avg = s.reduce((a,c) => a+c.score,0)/s.length; if (avg > bestAvg) { bestAvg = avg; best = bn; } }
+    });
+    return best ? bdn(best) + ' (' + bestAvg.toFixed(1) + ')' : 'N/A';
+  })();
+  const summaryRows = [
+    { Metric: 'Total Brews', Value: brews.length },
+    { Metric: 'Total Beans', Value: beans.length },
+    { Metric: 'Average Score', Value: scores.length ? +(scores.reduce((a,b)=>a+b,0)/scores.length).toFixed(1) : 'N/A' },
+    { Metric: 'Best Score', Value: scores.length ? Math.max(...scores) : 'N/A' },
+    { Metric: 'Average EY (%)', Value: eys.length ? +(eys.reduce((a,b)=>a+b,0)/eys.length).toFixed(1) : 'N/A' },
+    { Metric: 'Best EY (%)', Value: eys.length ? +(Math.max(...eys)).toFixed(1) : 'N/A' },
+    { Metric: 'Top Bean (Avg Score)', Value: topBean },
+    { Metric: 'Date Range', Value: brews.length ? brews[brews.length-1].date + ' → ' + brews[0].date : 'N/A' },
+    { Metric: 'Exported', Value: today() },
+  ];
+  addSheet('Summary', summaryRows);
+
+  XLSX.writeFile(wb, 'coffee-log-' + today() + '.xlsx');
+  showToast('Exported!');
+}
+function num(v) { return v != null && v !== '' ? +v : ''; }
+
+/* ──────────────────────────────────────────────────────────────
+   Sheets
+────────────────────────────────────────────────────────────── */
+function openSheet(id)  { document.getElementById(id)?.classList.add('open'); }
+function closeSheet(id) { document.getElementById(id)?.classList.remove('open'); }
+
+/* ──────────────────────────────────────────────────────────────
+   Toast
+────────────────────────────────────────────────────────────── */
+let _tt;
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(_tt);
+  _tt = setTimeout(() => el.classList.remove('show'), 2200);
+}
+
+/* ──────────────────────────────────────────────────────────────
+   Helpers
+────────────────────────────────────────────────────────────── */
+function uid()  { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+function esc(s) { if (!s) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function uniq(arr) { return [...new Set(arr.filter(Boolean))]; }
+function v(id)  { return document.getElementById(id)?.value?.trim() || ''; }
+function nv(id) { const n = parseFloat(document.getElementById(id)?.value); return isNaN(n) ? null : n; }
+function setV(id, val) { const el = document.getElementById(id); if (el) el.value = val ?? ''; }
+function setDisp(id, val, fallback) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = val || fallback;
+  el.style.color = val ? 'var(--text)' : '';
+}
+</script>
+</body>
+</html>
