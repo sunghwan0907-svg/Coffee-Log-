@@ -1,5 +1,9 @@
-const CACHE = 'brewlog-v1';
-const ASSETS = ['/', '/index.html'];
+const CACHE = 'brewlog-v2';
+const ASSETS = [
+  '/Coffee-Log-/',
+  '/Coffee-Log-/index.html',
+  '/Coffee-Log-/manifest.json'
+];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
