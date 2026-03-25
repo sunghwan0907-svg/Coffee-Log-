@@ -873,6 +873,7 @@ body {
   <div class="header">
     <div class="header-eye" id="hEye" style="color:var(--c-log)">Coffee Log</div>
     <div class="header-title" id="hTitle">New Brew</div>
+    <div id="dataStatus" style="font-size:12px;color:var(--text3);margin-top:3px;display:none"></div>
   </div>
 
   <!-- Content -->
@@ -1287,7 +1288,31 @@ const K_SETTINGS = 'bl_s4';
 const K_DRAFT    = 'bl_draft_v1';
 
 const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) || d; } catch { return d; } };
-const persist = (k, v) => localStorage.setItem(k, JSON.stringify(v));
+function persist(k, v) {
+  try {
+    localStorage.setItem(k, JSON.stringify(v));
+    /* verify write-back */
+    const check = localStorage.getItem(k);
+    if (!check) throw new Error('Write failed');
+  } catch(e) {
+    showToast('⚠️ Storage error — turn off Private Browsing');
+    console.error('persist failed:', k, e);
+  }
+}
+
+/* detect private browsing */
+function checkStorage() {
+  try {
+    localStorage.setItem('_test', '1');
+    const v = localStorage.getItem('_test');
+    localStorage.removeItem('_test');
+    if (v !== '1') throw new Error();
+  } catch(e) {
+    setTimeout(() => {
+      alert('⚠️ Private Browsing detected!\n\nYour data WILL NOT save in Private mode.\n\nTo fix: Open a normal Safari tab (not Private), then go to this URL again.');
+    }, 500);
+  }
+}
 
 let brews    = load(K_BREWS,    []);
 let beans    = load(K_BEANS,    []);
@@ -1364,7 +1389,19 @@ function restoreDraft() {
 
 function clearDraft() { localStorage.removeItem(K_DRAFT); }
 
+function updateDataStatus() {
+  const el = document.getElementById('dataStatus');
+  if (!el) return;
+  if (brews.length || beans.length) {
+    el.textContent = `💾 ${brews.length} brew${brews.length!==1?'s':''} · ${beans.length} bean${beans.length!==1?'s':''} saved`;
+    el.style.display = 'block';
+  } else {
+    el.style.display = 'none';
+  }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
+  checkStorage();
   setLogDate(logDate);
   buildSegControls();
   initSlider();
@@ -1373,6 +1410,7 @@ document.addEventListener('DOMContentLoaded', () => {
   renderDataset();
   renderStats();
   restoreDraft();
+  updateDataStatus();
 
   /* autosave on every input/change in the log form */
   document.getElementById('page-log').addEventListener('input',  saveDraft);
@@ -1767,6 +1805,7 @@ function saveBrew() {
   TAB_CFG.log.title = 'Edit Brew';
   document.getElementById('hTitle').textContent = 'Edit Brew';
   showToast(wasNew ? 'Brew saved ✓' : 'Brew updated');
+  updateDataStatus();
 }
 
 function resetLogForm() {
@@ -1872,6 +1911,7 @@ function saveBean() {
   renderBeans();
   closeSheet('sAddBean');
   showToast(editBeanId ? 'Bean updated' : 'Bean added');
+  updateDataStatus();
   editBeanId = null;
 }
 
@@ -2022,6 +2062,7 @@ function confirmDelete() {
     showToast('Brew deleted');
     delBrewId = null;
   }
+  updateDataStatus();
   closeSheet('sConfDel');
 }
 
