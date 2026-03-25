@@ -1137,6 +1137,33 @@ body {
           </div>
         </div>
       </div>
+      <!-- Cloud Sync -->
+      <div class="section">
+        <div class="section-header">Cloud Sync</div>
+        <div class="group">
+          <div class="row" style="flex-direction:column;align-items:stretch;gap:8px;padding:14px 18px">
+            <div style="display:flex;align-items:center;gap:10px">
+              <span style="font-size:22px">☁️</span>
+              <div>
+                <div style="font-size:15px;font-weight:600">Sync Across Devices</div>
+                <div style="font-size:13px;color:var(--text3)">Same data on iPhone &amp; laptop</div>
+              </div>
+              <span id="syncStatusDot" style="margin-left:auto;width:10px;height:10px;border-radius:50%;background:var(--text3)"></span>
+            </div>
+          </div>
+          <div class="row" style="flex-direction:column;align-items:stretch;gap:8px;padding:10px 18px">
+            <label style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text3)">GitHub Token</label>
+            <input class="row-input" id="ghToken" type="password" placeholder="Paste your token here" style="text-align:left;background:var(--fill);border-radius:10px;padding:10px 12px" oninput="saveGHToken()">
+            <a href="https://github.com/settings/tokens/new?scopes=public_repo&description=Brew+Log+Sync" target="_blank" style="font-size:13px;color:var(--blue);font-weight:600;text-decoration:none">Create token on GitHub →</a>
+          </div>
+          <div style="display:flex;gap:8px;padding:10px 18px 14px">
+            <button class="export-btn" style="flex:1;margin:0" onclick="syncPush()">☁️ Push</button>
+            <button class="export-btn" style="flex:1;margin:0" onclick="syncPull()">📥 Pull</button>
+          </div>
+          <div id="syncLog" style="padding:0 18px 14px;font-size:12px;color:var(--text3);display:none"></div>
+        </div>
+      </div>
+
       <button class="export-btn" onclick="exportXLSX()">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1v9M8 10l-3-3M8 10l3-3M2 13h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
         Export to Excel
@@ -1425,6 +1452,9 @@ document.addEventListener('DOMContentLoaded', () => {
   );
 
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+
+  /* cloud sync — restore token and pull on load */
+  initSync();
 });
 
 /* ──────────────────────────────────────────────────────────────
@@ -1806,6 +1836,7 @@ function saveBrew() {
   document.getElementById('hTitle').textContent = 'Edit Brew';
   showToast(wasNew ? 'Brew saved ✓' : 'Brew updated');
   updateDataStatus();
+  autoSync();
 }
 
 function resetLogForm() {
@@ -1912,6 +1943,7 @@ function saveBean() {
   closeSheet('sAddBean');
   showToast(editBeanId ? 'Bean updated' : 'Bean added');
   updateDataStatus();
+  autoSync();
   editBeanId = null;
 }
 
@@ -2063,6 +2095,7 @@ function confirmDelete() {
     delBrewId = null;
   }
   updateDataStatus();
+  autoSync();
   closeSheet('sConfDel');
 }
 
@@ -3230,6 +3263,149 @@ function setDisp(id, val, fallback) {
   if (!el) return;
   el.textContent = val || fallback;
   el.style.color = val ? 'var(--text)' : '';
+}
+
+/* ──────────────────────────────────────────────────────────────
+   Cloud Sync (GitHub)
+────────────────────────────────────────────────────────────── */
+const SYNC_OWNER = 'sunghwan0907-svg';
+const SYNC_REPO  = 'Coffee-Log-';
+const SYNC_FILE  = 'data.json';
+const K_TOKEN    = 'bl_gh_token';
+
+function getToken() { return localStorage.getItem(K_TOKEN) || ''; }
+
+function saveGHToken() {
+  const tok = document.getElementById('ghToken')?.value?.trim() || '';
+  if (tok) localStorage.setItem(K_TOKEN, tok);
+  else localStorage.removeItem(K_TOKEN);
+  updateSyncStatus();
+}
+
+function updateSyncStatus() {
+  const dot = document.getElementById('syncStatusDot');
+  const tok = getToken();
+  if (dot) dot.style.background = tok ? 'var(--green)' : 'var(--text3)';
+}
+
+function syncLog(msg) {
+  const el = document.getElementById('syncLog');
+  if (!el) return;
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+async function syncPush() {
+  const token = getToken();
+  if (!token) { showToast('Add your GitHub token first'); return; }
+
+  syncLog('Pushing…');
+  try {
+    const data = { brews, beans, equipment: settings, ts: Date.now() };
+    const content = btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+
+    /* get current file SHA (needed for update) */
+    let sha = null;
+    try {
+      const res = await fetch(`https://api.github.com/repos/${SYNC_OWNER}/${SYNC_REPO}/contents/${SYNC_FILE}`, {
+        headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github.v3+json' }
+      });
+      if (res.ok) { const d = await res.json(); sha = d.sha; }
+    } catch(e) {}
+
+    const body = { message: 'Sync ' + new Date().toISOString(), content };
+    if (sha) body.sha = sha;
+
+    const res = await fetch(`https://api.github.com/repos/${SYNC_OWNER}/${SYNC_REPO}/contents/${SYNC_FILE}`, {
+      method: 'PUT',
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json', 'Accept': 'application/vnd.github.v3+json' },
+      body: JSON.stringify(body),
+    });
+
+    if (res.ok) {
+      showToast('☁️ Pushed to cloud');
+      syncLog('Last push: ' + new Date().toLocaleTimeString());
+    } else {
+      const err = await res.json().catch(() => ({}));
+      showToast('Push failed — check token');
+      syncLog('Error: ' + (err.message || res.status));
+    }
+  } catch(e) {
+    showToast('Push failed — network error');
+    syncLog('Error: ' + e.message);
+  }
+}
+
+async function syncPull() {
+  const token = getToken();
+  syncLog('Pulling…');
+
+  try {
+    const headers = { 'Accept': 'application/vnd.github.v3+json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const res = await fetch(`https://api.github.com/repos/${SYNC_OWNER}/${SYNC_REPO}/contents/${SYNC_FILE}`, { headers });
+    if (!res.ok) {
+      if (res.status === 404) { syncLog('No cloud data yet — push first'); showToast('No cloud data found'); }
+      else { syncLog('Pull failed: ' + res.status); showToast('Pull failed'); }
+      return;
+    }
+
+    const d = await res.json();
+    const json = decodeURIComponent(escape(atob(d.content.replace(/\n/g, ''))));
+    const data = JSON.parse(json);
+
+    /* merge by ID — add anything remote has that local doesn't */
+    let added = 0;
+    if (data.brews && Array.isArray(data.brews)) {
+      const localIds = new Set(brews.map(b => b.id));
+      data.brews.forEach(b => { if (!localIds.has(b.id)) { brews.push(b); added++; } });
+      persist(K_BREWS, brews);
+    }
+    if (data.beans && Array.isArray(data.beans)) {
+      const localIds = new Set(beans.map(b => b.id));
+      data.beans.forEach(b => { if (!localIds.has(b.id)) { beans.push(b); added++; } });
+      persist(K_BEANS, beans);
+    }
+    if (data.equipment) {
+      ['grinders','brewers','filters'].forEach(k => {
+        if (data.equipment[k]) {
+          const merged = [...new Set([...(settings[k]||[]), ...data.equipment[k]])];
+          settings[k] = merged;
+        }
+      });
+      persist(K_SETTINGS, settings);
+      renderEquipLists();
+    }
+
+    renderBeans();
+    renderDataset();
+    renderStats();
+    updateDataStatus();
+
+    showToast(added > 0 ? `☁️ Synced — ${added} new item${added>1?'s':''}` : '☁️ Already up to date');
+    syncLog('Last pull: ' + new Date().toLocaleTimeString() + (added ? ` (+${added})` : ''));
+  } catch(e) {
+    showToast('Pull failed');
+    syncLog('Error: ' + e.message);
+  }
+}
+
+/* auto-push after saving (debounced) */
+let _syncTimer = null;
+function autoSync() {
+  if (!getToken()) return;
+  clearTimeout(_syncTimer);
+  _syncTimer = setTimeout(syncPush, 3000); // push 3s after last change
+}
+
+/* restore token on load + auto-pull */
+function initSync() {
+  const tok = getToken();
+  const el = document.getElementById('ghToken');
+  if (el && tok) el.value = tok;
+  updateSyncStatus();
+  if (tok) syncPull(); // auto-pull on app load
 }
 </script>
 </body>
