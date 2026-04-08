@@ -1713,7 +1713,9 @@ function pickBean(id) {
 }
 
 function bdn(b) {
-  return [b.roaster, b.farmName, b.farm, b.processing, b.varietal, b.other].filter(Boolean).join(' · ');
+  const parts = [b.roaster, b.farmName, b.farm, b.processing, b.varietal].filter(Boolean);
+  if (b.other) parts.push('(' + b.other + ')');
+  return parts.join(' · ');
 }
 
 function beanAge(b, refDate) {
