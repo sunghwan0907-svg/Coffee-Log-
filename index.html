@@ -3338,7 +3338,11 @@ function exportXLSX() {
     const bean = beans.find(bn => bn.id === b.beanId);
     const beanKey = b.beanId || 'unknown';
     _beanBrewCount[beanKey] = (_beanBrewCount[beanKey] || 0) + 1;
-    const dor = getDOR(bean, b);
+    let dor = null;
+    if (bean && bean.roastDate && b.date) {
+      if (b.frozen && b.daysOffRoast != null) { dor = b.daysOffRoast; }
+      else { dor = Math.max(0, Math.floor((new Date(b.date+'T12:00:00') - new Date(bean.roastDate+'T12:00:00')) / 86400000)); }
+    }
     const ratio = (b.dose && b.water) ? +(b.water / b.dose).toFixed(1) : '';
     return {
       '#': _beanBrewCount[beanKey],
@@ -3428,7 +3432,11 @@ function exportXLSX() {
     const bBrews = sortedBrews.filter(b => b.beanId === bean.id);
     if (!bBrews.length) return;
     bBrews.forEach(b => {
-      const dor = getDOR(bean, b);
+      let dor = null;
+      if (bean.roastDate && b.date) {
+        if (b.frozen && b.daysOffRoast != null) { dor = b.daysOffRoast; }
+        else { dor = Math.max(0, Math.floor((new Date(b.date+'T12:00:00') - new Date(bean.roastDate+'T12:00:00')) / 86400000)); }
+      }
       breakdownRows.push({
         'Bean': bdn(bean),
         'Date': b.date || '',
