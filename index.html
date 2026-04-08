@@ -1094,6 +1094,7 @@ body {
       <div class="ds-search-wrap">
         <input type="text" id="dsSearch" class="ds-search" placeholder="Search beans, roasters…" oninput="renderDataset()">
       </div>
+      <div style="padding:0 16px 8px;display:flex;gap:6px;overflow-x:auto;-webkit-overflow-scrolling:touch" id="dsFilterBar"></div>
       <div class="section" id="datasetSection"></div>
     </div>
 
@@ -1206,9 +1207,9 @@ body {
 
   <!-- Tab bar -->
   <div class="tabbar">
-    <button class="tab-btn active" data-tab="log"      onclick="goTab('log')">      <span class="tab-icon">☕</span><span class="tab-label">Log</span></button>
+    <button class="tab-btn active" data-tab="log"      onclick="goTab('log')">      <span class="tab-icon">☕</span><span class="tab-label">Input</span></button>
     <button class="tab-btn"        data-tab="bean"     onclick="goTab('bean')">     <span class="tab-icon">🌱</span><span class="tab-label">Bean</span></button>
-    <button class="tab-btn"        data-tab="dataset"  onclick="goTab('dataset')">  <span class="tab-icon">📋</span><span class="tab-label">Dataset</span></button>
+    <button class="tab-btn"        data-tab="dataset"  onclick="goTab('dataset')">  <span class="tab-icon">📋</span><span class="tab-label">Coffee Log</span></button>
     <button class="tab-btn tab-btn-new" onclick="startNewBrew()" style="background:var(--accent);border-radius:50%;width:46px;height:46px;flex:none;margin:-10px 2px 0;align-self:center;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(200,85,58,0.4)"><span style="font-size:26px;line-height:1;color:#fff;font-weight:300">+</span></button>
     <button class="tab-btn"        data-tab="guide"    onclick="goTab('guide')">    <span class="tab-icon">👅</span><span class="tab-label">Tasting</span></button>
     <button class="tab-btn"        data-tab="settings" onclick="goTab('settings')"> <span class="tab-icon">⚙️</span><span class="tab-label">Settings</span></button>
@@ -1249,6 +1250,15 @@ body {
       <input type="date" id="dateInput" style="width:100%;padding:12px;border-radius:10px;border:none;background:var(--fill);font-size:16px;font-family:inherit;color:var(--text);outline:none">
       <button class="btn-primary" style="margin:16px 0 0" onclick="confirmDate()">Confirm</button>
     </div>
+  </div>
+</div>
+
+<!-- Dataset Filter picker -->
+<div class="overlay" id="sDsFilter">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title" id="dsFilterTitle">Filter</div>
+    <div class="sheet-scroll" id="dsFilterList" style="padding:8px 0"></div>
   </div>
 </div>
 
@@ -1464,9 +1474,9 @@ document.addEventListener('DOMContentLoaded', () => {
    Tabs
 ────────────────────────────────────────────────────────────── */
 const TAB_CFG = {
-  log:      { title: 'New Brew',     eye: 'Coffee Log',       color: '--c-log',      fab: false },
+  log:      { title: 'New Brew',     eye: 'Input',             color: '--c-log',      fab: false },
   bean:     { title: 'Bean Library', eye: 'Coffee Beans',     color: '--c-bean',     fab: true  },
-  dataset:  { title: 'Dataset',      eye: 'All Sessions',     color: '--c-dataset',  fab: false },
+  dataset:  { title: 'Coffee Log',   eye: 'All Sessions',     color: '--c-dataset',  fab: false },
   guide:    { title: 'Tasting Guide',eye: 'Flavor Explorer',  color: '--c-guide',    fab: false },
   settings: { title: 'Settings',     eye: 'Configuration',    color: '--c-settings', fab: false },
   stats:    { title: 'Stats',        eye: 'Season Overview',  color: '--c-stats',    fab: false },
@@ -2038,15 +2048,62 @@ function askDeleteBean() {
 /* ──────────────────────────────────────────────────────────────
    Dataset
 ────────────────────────────────────────────────────────────── */
+let _dsFilter = { key: '', val: '' };
+
+function renderDsFilterBar() {
+  const el = document.getElementById('dsFilterBar');
+  if (!el) return;
+  if (_dsFilter.key && _dsFilter.val) {
+    const label = BEAN_FILTER_FIELDS.find(f => f.key === _dsFilter.key)?.label || '';
+    el.innerHTML = `<button style="flex-shrink:0;padding:6px 14px;border-radius:20px;font-size:13px;font-weight:600;border:none;cursor:pointer;font-family:inherit;background:var(--accent);color:#fff" onclick="clearDsFilter()">✕ ${esc(label)}: ${esc(_dsFilter.val)}</button>`;
+  } else {
+    el.innerHTML = BEAN_FILTER_FIELDS.map(f =>
+      `<button style="flex-shrink:0;padding:6px 14px;border-radius:20px;font-size:13px;font-weight:600;border:none;cursor:pointer;font-family:inherit;background:var(--fill);color:var(--text2)" onclick="openDsFilter('${f.key}','${f.label}')">${f.label}</button>`
+    ).join('');
+  }
+}
+
+function openDsFilter(key, label) {
+  /* collect unique values from beans that have brews */
+  const brewBeanIds = new Set(brews.map(b => b.beanId));
+  const relevantBeans = beans.filter(b => brewBeanIds.has(b.id));
+  const vals = uniq(relevantBeans.map(b => b[key]).filter(Boolean)).sort();
+  document.getElementById('dsFilterTitle').textContent = 'Filter by ' + label;
+  document.getElementById('dsFilterList').innerHTML = vals.length
+    ? vals.map(v => `<div class="row row-tappable" onclick="selectDsFilter('${key}','${esc(v.replace(/'/g,"\\'"))}')"><span style="font-size:15px;font-weight:500">${esc(v)}</span><span class="row-chevron">›</span></div>`).join('')
+    : '<div style="padding:24px;text-align:center;color:var(--text3)">No values</div>';
+  openSheet('sDsFilter');
+}
+
+function selectDsFilter(key, val) {
+  _dsFilter = { key, val };
+  closeSheet('sDsFilter');
+  renderDsFilterBar();
+  renderDataset();
+}
+
+function clearDsFilter() {
+  _dsFilter = { key: '', val: '' };
+  renderDsFilterBar();
+  renderDataset();
+}
+
 function renderDataset() {
   const el = document.getElementById('datasetSection');
+  renderDsFilterBar();
   const q = (document.getElementById('dsSearch')?.value || '').trim().toLowerCase();
   let filtered = brews;
   if (q) {
     filtered = brews.filter(brew => {
       const bean = beans.find(b => b.id === brew.beanId);
-      const haystack = [bean?.roaster, bean?.farm, bean?.processing, bean?.varietal, bean?.other, brew.name, brew.brewer, brew.grinder].filter(Boolean).join(' ').toLowerCase();
+      const haystack = [bean?.roaster, bean?.farmName, bean?.farm, bean?.processing, bean?.varietal, bean?.other, brew.name, brew.brewer, brew.grinder].filter(Boolean).join(' ').toLowerCase();
       return haystack.includes(q);
+    });
+  }
+  if (_dsFilter.key && _dsFilter.val) {
+    filtered = filtered.filter(brew => {
+      const bean = beans.find(b => b.id === brew.beanId);
+      return bean && bean[_dsFilter.key] === _dsFilter.val;
     });
   }
   if (!filtered.length) {
