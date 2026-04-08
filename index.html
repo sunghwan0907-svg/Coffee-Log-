@@ -1717,8 +1717,12 @@ function pickBean(id) {
 }
 
 function bdn(b) {
-  const parts = [b.roaster, b.farmName, b.farm, b.processing, b.varietal].filter(Boolean);
-  if (b.other) parts.push('(' + b.other + ')');
+  return [b.roaster, b.farmName, b.processing, b.varietal].filter(Boolean).join(' · ');
+}
+function bdnSub(b) {
+  const parts = [];
+  if (b.farm) parts.push(b.farm);
+  if (b.other) parts.push(b.other);
   return parts.join(' · ');
 }
 
@@ -1929,13 +1933,12 @@ function renderBeans() {
     return `
     <div class="bean-card" onclick="editBeanOpen('${b.id}')">
       <div class="bean-name">${esc(bdn(b))}</div>
+      ${bdnSub(b) ? `<div style="font-size:13px;color:var(--text2);font-weight:400;margin:-4px 0 6px;line-height:1.3">${esc(bdnSub(b))}</div>` : ''}
       <div class="tags">
         ${b.roaster    ? `<span class="tag tag-r">${esc(b.roaster)}</span>`    : ''}
-        ${b.farm       ? `<span class="tag tag-f">${esc(b.farm)}</span>`       : ''}
+        ${b.farmName   ? `<span class="tag" style="background:rgba(139,106,174,0.12);color:#8b6aae">${esc(b.farmName)}</span>` : ''}
         ${b.processing ? `<span class="tag tag-p">${esc(b.processing)}</span>` : ''}
         ${b.varietal   ? `<span class="tag tag-v">${esc(b.varietal)}</span>`   : ''}
-        ${b.farmName   ? `<span class="tag" style="background:rgba(139,106,174,0.12);color:#8b6aae">${esc(b.farmName)}</span>` : ''}
-        ${b.other      ? `<span class="tag tag-o">${esc(b.other)}</span>`      : ''}
       </div>
       ${age ? `<div class="bean-age${age.frozen?' bean-age-frozen':''}">${age.frozen?'❄ Frozen · Day '+age.days:'Day '+age.days+' post-roast'}</div>` : ''}
     </div>`;
