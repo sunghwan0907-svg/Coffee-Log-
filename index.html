@@ -3481,15 +3481,20 @@ function exportXLSX() {
   });
   XLSX.utils.book_append_sheet(wb, styledSheet(breakdownRows, byBeanColGroups), 'By Bean');
 
-  /* ── 4. COACH VIEW ── */
+  /* ── 4. COACH VIEW (only beans from coach's roastery) ── */
   const coachData = [];
+  const emptyCoachRow = { '#':'','Date':'','DOR':'','Score':'','Grind':'','Recipe':'','Thoughts':'','Dose':'','Water':'','Ratio':'','Temp':'','Bloom':'','Time':'','Hot Notes':'','Cool Notes':'','Adjustments':'' };
   const coachColGroups = {
     '#':'id','Date':'id','DOR':'bean','Score':'score',
-    'Grind':'recipe','Dose':'recipe','Water':'recipe','Ratio':'recipe','Temp':'recipe','Bloom':'recipe','Time':'recipe',
+    'Grind':'recipe','Recipe':'id','Thoughts':'id',
+    'Dose':'recipe','Water':'recipe','Ratio':'recipe','Temp':'recipe','Bloom':'recipe','Time':'recipe',
     'Hot Notes':'sensory','Cool Notes':'sensory','Adjustments':'id',
   };
 
-  beans.forEach(bean => {
+  /* Filter: only beans where roaster starts with "Axil" */
+  const coachBeans = beans.filter(b => b.roaster && /^axil/i.test(b.roaster.trim()));
+
+  coachBeans.forEach(bean => {
     const bBrews = sortedBrews.filter(b => b.beanId === bean.id);
     if (!bBrews.length) return;
 
@@ -3515,8 +3520,11 @@ function exportXLSX() {
       bestLine = parts.join(', ');
     }
 
-    /* Bean header row — use all columns, merge visually */
-    coachData.push({ '#': '▸ ' + summaryLine, 'Date': '', 'DOR': '', 'Score': '', 'Grind': bestLine, 'Dose': '', 'Water': '', 'Ratio': '', 'Temp': '', 'Bloom': '', 'Time': '', 'Hot Notes': '', 'Cool Notes': '', 'Adjustments': '' });
+    /* Bean header row */
+    const hdr = { ...emptyCoachRow };
+    hdr['#'] = '▸ ' + summaryLine;
+    hdr['Grind'] = bestLine;
+    coachData.push(hdr);
 
     let cnt = 0;
     chrono.forEach(b => {
@@ -3532,6 +3540,8 @@ function exportXLSX() {
         'DOR': dor != null ? dor : '',
         'Score': num(b.score),
         'Grind': b.grind || '',
+        'Recipe': b.recipeNotes || '',
+        'Thoughts': b.notes || '',
         'Dose': num(b.dose),
         'Water': num(b.water),
         'Ratio': (b.dose && b.water) ? +(b.water/b.dose).toFixed(1) : '',
@@ -3545,7 +3555,7 @@ function exportXLSX() {
     });
 
     /* blank separator row */
-    coachData.push({ '#':'','Date':'','DOR':'','Score':'','Grind':'','Dose':'','Water':'','Ratio':'','Temp':'','Bloom':'','Time':'','Hot Notes':'','Cool Notes':'','Adjustments':'' });
+    coachData.push({ ...emptyCoachRow });
   });
 
   if (coachData.length) {
