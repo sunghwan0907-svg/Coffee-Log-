@@ -1082,6 +1082,10 @@ body {
 
     <!-- ══ BEAN ══════════════════════════════════════════════════ -->
     <div class="tab-page" id="page-bean">
+      <div class="ds-search-wrap">
+        <input type="text" id="beanSearch" class="ds-search" placeholder="Search beans…" oninput="renderBeans()">
+      </div>
+      <div style="padding:0 16px 4px;display:flex;gap:6px;flex-wrap:wrap" id="beanFilterChips"></div>
       <div class="section" id="beanListSection"></div>
     </div>
 
@@ -1869,13 +1873,58 @@ function startNewBrew() {
 /* ──────────────────────────────────────────────────────────────
    Bean library
 ────────────────────────────────────────────────────────────── */
+let _beanFilter = { key: '', val: '' };
+
+function renderBeanFilters() {
+  const el = document.getElementById('beanFilterChips');
+  if (!el) return;
+  const fields = [
+    { key: 'roaster', label: 'Roaster' },
+    { key: 'farmName', label: 'Farm' },
+    { key: 'farm', label: 'Region' },
+    { key: 'processing', label: 'Processing' },
+    { key: 'varietal', label: 'Varietal' },
+    { key: 'other', label: 'Other' },
+  ];
+  /* collect unique values for active filter key */
+  if (_beanFilter.key && !_beanFilter.val) {
+    const vals = uniq(beans.map(b => b[_beanFilter.key]).filter(Boolean)).sort();
+    el.innerHTML = `<button class="tag" style="background:var(--fill);color:var(--text);font-size:13px;padding:6px 12px;border:none;cursor:pointer;border-radius:20px;font-weight:600" onclick="_beanFilter={key:'',val:''};renderBeanFilters();renderBeans()">✕ Back</button>` +
+      vals.map(v => `<button class="tag" style="background:var(--accent);color:#fff;font-size:13px;padding:6px 12px;border:none;cursor:pointer;border-radius:20px;font-weight:600" onclick="_beanFilter.val='${esc(v.replace(/'/g,"\\'"))}';renderBeanFilters();renderBeans()">${esc(v)}</button>`).join('');
+    return;
+  }
+  if (_beanFilter.key && _beanFilter.val) {
+    el.innerHTML = `<button class="tag" style="background:var(--accent);color:#fff;font-size:13px;padding:6px 12px;border:none;cursor:pointer;border-radius:20px;font-weight:600" onclick="_beanFilter={key:'',val:''};renderBeanFilters();renderBeans()">✕ ${esc(_beanFilter.val)}</button>`;
+    return;
+  }
+  el.innerHTML = fields.map(f =>
+    `<button class="tag" style="background:var(--fill);color:var(--text2);font-size:12px;padding:5px 10px;border:none;cursor:pointer;border-radius:20px;font-weight:600" onclick="_beanFilter={key:'${f.key}',val:''};renderBeanFilters();renderBeans()">${f.label}</button>`
+  ).join('');
+}
+
 function renderBeans() {
   const el = document.getElementById('beanListSection');
+  renderBeanFilters();
   if (!beans.length) {
     el.innerHTML = '<div class="empty"><div class="empty-icon">🌱</div><div class="empty-title">No beans yet</div><div class="empty-sub">Tap + to add your first bean</div></div>';
     return;
   }
-  el.innerHTML = beans.map(b => {
+  const q = (document.getElementById('beanSearch')?.value || '').toLowerCase().trim();
+  let filtered = beans;
+  if (q) {
+    filtered = filtered.filter(b => {
+      const text = [b.roaster, b.farmName, b.farm, b.processing, b.varietal, b.other].filter(Boolean).join(' ').toLowerCase();
+      return text.includes(q);
+    });
+  }
+  if (_beanFilter.key && _beanFilter.val) {
+    filtered = filtered.filter(b => b[_beanFilter.key] === _beanFilter.val);
+  }
+  if (!filtered.length) {
+    el.innerHTML = '<div style="text-align:center;padding:32px 16px;color:var(--text3)">No beans match</div>';
+    return;
+  }
+  el.innerHTML = filtered.map(b => {
     const age = beanAge(b);
     return `
     <div class="bean-card" onclick="editBeanOpen('${b.id}')">
