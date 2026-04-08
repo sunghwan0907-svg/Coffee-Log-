@@ -3458,7 +3458,104 @@ function exportXLSX() {
   });
   XLSX.utils.book_append_sheet(wb, styledSheet(breakdownRows, byBeanColGroups), 'By Bean');
 
-  /* ── 4. SUMMARY ── */
+  /* ── 4. COACH VIEW ── */
+  const coachData = [];
+  const coachColGroups = {
+    '#':'id','Date':'id','DOR':'bean','Score':'score',
+    'Grind':'recipe','Dose':'recipe','Water':'recipe','Ratio':'recipe','Temp':'recipe','Bloom':'recipe','Time':'recipe',
+    'Hot Notes':'sensory','Cool Notes':'sensory','Adjustments':'id',
+  };
+
+  beans.forEach(bean => {
+    const bBrews = sortedBrews.filter(b => b.beanId === bean.id);
+    if (!bBrews.length) return;
+
+    /* chronological order for coach (oldest first = dial-in journey) */
+    const chrono = [...bBrews].reverse();
+    const scored = chrono.filter(b => b.score != null);
+    const bestBrew = scored.length ? [...scored].sort((a,c) => c.score - a.score)[0] : null;
+    const bestIdx = bestBrew ? chrono.indexOf(bestBrew) + 1 : null;
+
+    /* Summary header row for this bean */
+    const summaryParts = [bdn(bean)];
+    if (bean.farm) summaryParts.push(bean.farm);
+    const summaryLine = summaryParts.join(' — ');
+    let bestLine = '';
+    if (bestBrew) {
+      const parts = [];
+      parts.push('Best: ' + bestBrew.score + '/10 on brew #' + bestIdx);
+      if (bestBrew.grind) parts.push('Grind ' + bestBrew.grind);
+      const recipe = [bestBrew.dose ? bestBrew.dose+'g' : '', bestBrew.water ? bestBrew.water+'ml' : ''].filter(Boolean).join('/');
+      if (recipe) parts.push(recipe);
+      if (bestBrew.temp) parts.push(bestBrew.temp + '°C');
+      if (bestBrew.totalTime) parts.push(bestBrew.totalTime);
+      bestLine = parts.join(', ');
+    }
+
+    /* Bean header row — use all columns, merge visually */
+    coachData.push({ '#': '▸ ' + summaryLine, 'Date': '', 'DOR': '', 'Score': '', 'Grind': bestLine, 'Dose': '', 'Water': '', 'Ratio': '', 'Temp': '', 'Bloom': '', 'Time': '', 'Hot Notes': '', 'Cool Notes': '', 'Adjustments': '' });
+
+    let cnt = 0;
+    chrono.forEach(b => {
+      cnt++;
+      let dor = null;
+      if (bean.roastDate && b.date) {
+        if (b.frozen && b.daysOffRoast != null) { dor = b.daysOffRoast; }
+        else { dor = Math.max(0, Math.floor((new Date(b.date+'T12:00:00') - new Date(bean.roastDate+'T12:00:00')) / 86400000)); }
+      }
+      coachData.push({
+        '#': cnt,
+        'Date': b.date || '',
+        'DOR': dor != null ? dor : '',
+        'Score': num(b.score),
+        'Grind': b.grind || '',
+        'Dose': num(b.dose),
+        'Water': num(b.water),
+        'Ratio': (b.dose && b.water) ? +(b.water/b.dose).toFixed(1) : '',
+        'Temp': num(b.temp),
+        'Bloom': num(b.bloom),
+        'Time': b.totalTime || '',
+        'Hot Notes': b.hot?.notes || '',
+        'Cool Notes': b.cool?.notes || '',
+        'Adjustments': b.adjust || '',
+      });
+    });
+
+    /* blank separator row */
+    coachData.push({ '#':'','Date':'','DOR':'','Score':'','Grind':'','Dose':'','Water':'','Ratio':'','Temp':'','Bloom':'','Time':'','Hot Notes':'','Cool Notes':'','Adjustments':'' });
+  });
+
+  if (coachData.length) {
+    const wsCoach = styledSheet(coachData, coachColGroups);
+
+    /* Style the bean header rows — navy background spanning all cols */
+    const coachKeys = Object.keys(coachData[0]);
+    coachData.forEach((row, ri) => {
+      if (typeof row['#'] === 'string' && row['#'].startsWith('▸')) {
+        coachKeys.forEach((k, c) => {
+          const addr = XLSX.utils.encode_cell({ r: ri + 1, c });
+          if (wsCoach[addr]) {
+            wsCoach[addr].s = {
+              font: { bold: true, color: white, name: 'Calibri', sz: 11 },
+              fill: { fgColor: { rgb: '2C3E5A' } },
+              border: baseBorder,
+              alignment: { vertical: 'center' },
+            };
+          }
+        });
+      }
+      /* blank separator rows */
+      if (row['#'] === '' && row['Date'] === '' && row['Score'] === '') {
+        coachKeys.forEach((k, c) => {
+          const addr = XLSX.utils.encode_cell({ r: ri + 1, c });
+          if (wsCoach[addr]) wsCoach[addr].s = { fill: { fgColor: white }, border: {} };
+        });
+      }
+    });
+    XLSX.utils.book_append_sheet(wb, wsCoach, 'Coach View');
+  }
+
+  /* ── 5. SUMMARY ── */
   const scores = brews.filter(b => b.score != null).map(b => b.score);
   const eys = brews.filter(b => b.ey != null).map(b => b.ey);
   const topBean = (() => {
