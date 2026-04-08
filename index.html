@@ -3457,42 +3457,7 @@ function exportXLSX() {
   });
   XLSX.utils.book_append_sheet(wb, styledSheet(brewRows, brewColGroups), 'Brew Log');
 
-  /* ── 2. BEANS ── */
-  const beanColGroups = {
-    'Roaster':'bean','Farm':'bean','Region':'bean','Processing':'bean','Varietal':'bean','Other':'bean',
-    'Roast Date':'bean','Frozen Day':'bean',
-    'Brews':'score','Avg Score':'score','Best Score':'score','Avg EY':'extract','Best EY':'extract',
-    'Best Grind':'recipe','Best Dose':'recipe','Best Water':'recipe','Best Temp':'recipe','Best Time':'recipe',
-  };
-  const beanRows = beans.map(b => {
-    const bBrews = brews.filter(br => br.beanId === b.id);
-    const scored = bBrews.filter(br => br.score != null);
-    const eyVals = bBrews.filter(br => br.ey != null);
-    const bestBrew = scored.length ? [...scored].sort((a,c) => c.score - a.score)[0] : null;
-    return {
-      'Roaster': b.roaster || '',
-      'Farm': b.farmName || '',
-      'Region': b.farm || '',
-      'Processing': b.processing || '',
-      'Varietal': b.varietal || '',
-      'Other': b.other || '',
-      'Roast Date': b.roastDate || '',
-      'Frozen Day': b.frozenDay != null ? b.frozenDay : '',
-      'Brews': bBrews.length,
-      'Avg Score': scored.length ? +(scored.reduce((a,c) => a + c.score, 0) / scored.length).toFixed(1) : '',
-      'Best Score': scored.length ? Math.max(...scored.map(s => s.score)) : '',
-      'Avg EY': eyVals.length ? +(eyVals.reduce((a,c) => a + c.ey, 0) / eyVals.length).toFixed(1) : '',
-      'Best EY': eyVals.length ? +(Math.max(...eyVals.map(e => e.ey))).toFixed(1) : '',
-      'Best Grind': bestBrew?.grind || '',
-      'Best Dose': num(bestBrew?.dose),
-      'Best Water': num(bestBrew?.water),
-      'Best Temp': num(bestBrew?.temp),
-      'Best Time': bestBrew?.totalTime || '',
-    };
-  });
-  XLSX.utils.book_append_sheet(wb, styledSheet(beanRows, beanColGroups), 'Beans');
-
-  /* ── 3. BY BEAN ── */
+  /* ── 2. BY BEAN ── */
   const byBeanColGroups = {
     'Bean':'bean','Date':'id','DOR':'bean','Score':'score',
     'Grind':'recipe','Dose':'recipe','Water':'recipe','Ratio':'recipe','Temp':'recipe','Bloom':'recipe','Time':'recipe',
@@ -3636,74 +3601,135 @@ function exportXLSX() {
     XLSX.utils.book_append_sheet(wb, wsCoach, 'Coach View');
   }
 
-  /* ── 5. SUMMARY ── */
-  const scores = brews.filter(b => b.score != null).map(b => b.score);
-  const eys = brews.filter(b => b.ey != null).map(b => b.ey);
-  const topBean = (() => {
-    let best = null, bestAvg = 0;
-    beans.forEach(bn => {
-      const s = brews.filter(b => b.beanId === bn.id && b.score != null);
-      if (s.length >= 1) { const avg = s.reduce((a,c) => a+c.score,0)/s.length; if (avg > bestAvg) { bestAvg = avg; best = bn; } }
-    });
-    return best ? bdn(best) + ' (' + bestAvg.toFixed(1) + ')' : '—';
-  })();
-
-  const sumData = [
-    ['', ''],
-    ['BREW LOG SUMMARY', ''],
-    ['', ''],
-    ['Total Brews', brews.length],
-    ['Total Beans', beans.length],
-    ['', ''],
-    ['SCORING', ''],
-    ['Average Score', scores.length ? +(scores.reduce((a,b)=>a+b,0)/scores.length).toFixed(1) : '—'],
-    ['Best Score', scores.length ? Math.max(...scores) : '—'],
-    ['Top Bean', topBean],
-    ['', ''],
-    ['EXTRACTION', ''],
-    ['Average EY', eys.length ? +(eys.reduce((a,b)=>a+b,0)/eys.length).toFixed(1) + '%' : '—'],
-    ['Best EY', eys.length ? +(Math.max(...eys)).toFixed(1) + '%' : '—'],
-    ['', ''],
-    ['DETAILS', ''],
-    ['Date Range', brews.length ? brews[brews.length-1].date + '  to  ' + brews[0].date : '—'],
-    ['Exported', today()],
-  ];
-
-  const ws4 = XLSX.utils.aoa_to_sheet(sumData);
-  ws4['!cols'] = [{ wch: 22 }, { wch: 35 }];
-
-  /* Style summary */
+  /* ── 4. CHARTS ── */
+  /* Reusable styles matching summary design language */
   const titleStyle = { font: { bold: true, sz: 14, color: white, name: 'Calibri' }, fill: { fgColor: navy }, alignment: { vertical: 'center' }, border: baseBorder };
   const sectionStyle = { font: { bold: true, sz: 11, color: { rgb: '1B2A4A' }, name: 'Calibri' }, fill: { fgColor: sand }, border: baseBorder };
   const metricLabel = { font: { sz: 10.5, color: { rgb: '5A5A5A' }, name: 'Calibri' }, fill: { fgColor: cream }, border: baseBorder, alignment: { vertical: 'center' } };
   const metricVal = { font: { bold: true, sz: 11, color: { rgb: '1B2A4A' }, name: 'Calibri' }, fill: { fgColor: cream }, border: baseBorder, alignment: { horizontal: 'right', vertical: 'center' } };
-  const blankStyle = { fill: { fgColor: white }, border: baseBorder };
+  const subHdr = { font: { bold: true, sz: 10, color: white, name: 'Calibri' }, fill: { fgColor: { rgb: '3D5A80' } }, alignment: { horizontal: 'center', vertical: 'center' }, border: baseBorder };
+  const dataCell = { font: { sz: 10.5, color: { rgb: '2D2D2D' }, name: 'Calibri' }, fill: { fgColor: cream }, border: baseBorder, alignment: { vertical: 'center' } };
+  const dataCellR = { ...dataCell, alignment: { horizontal: 'right', vertical: 'center' } };
+  const blankStyle = { fill: { fgColor: white }, border: {} };
 
-  sumData.forEach((row, r) => {
-    const a0 = XLSX.utils.encode_cell({r,c:0});
-    const a1 = XLSX.utils.encode_cell({r,c:1});
-    if (!ws4[a0]) ws4[a0] = { v: '', t: 's' };
-    if (!ws4[a1]) ws4[a1] = { v: '', t: 's' };
+  const scores = brews.filter(b => b.score != null).map(b => b.score);
+  const eys = brews.filter(b => b.ey != null).map(b => b.ey);
 
-    if (row[0] === 'BREW LOG SUMMARY' || row[0] === '') {
-      if (row[0] === 'BREW LOG SUMMARY') {
-        ws4[a0].s = titleStyle;
-        ws4[a1].s = titleStyle;
-      } else {
-        ws4[a0].s = blankStyle;
-        ws4[a1].s = blankStyle;
-      }
-    } else if (['SCORING','EXTRACTION','DETAILS'].includes(row[0])) {
-      ws4[a0].s = sectionStyle;
-      ws4[a1].s = sectionStyle;
-    } else {
-      ws4[a0].s = metricLabel;
-      ws4[a1].s = metricVal;
+  /* Build chart data */
+  const chartRows = [];
+  const SECTIONS = []; // track which rows are titles/sections/blanks for styling
+
+  function addTitle(text, cols) { chartRows.push(Array(cols).fill('')); SECTIONS.push('blank'); chartRows.push([text, ...Array(cols-1).fill('')]); SECTIONS.push('title'); chartRows.push(Array(cols).fill('')); SECTIONS.push('blank'); }
+  function addSection(text, cols) { chartRows.push([text, ...Array(cols-1).fill('')]); SECTIONS.push('section'); }
+  function addMetric(label, val) { chartRows.push([label, val, '', '', '', '']); SECTIONS.push('metric'); }
+  function addBlank(cols) { chartRows.push(Array(cols).fill('')); SECTIONS.push('blank'); }
+  function addSubHdr(arr) { chartRows.push(arr); SECTIONS.push('subhdr'); }
+  function addData(arr) { chartRows.push(arr); SECTIONS.push('data'); }
+
+  const COLS = 6;
+
+  /* ── Overview ── */
+  addTitle('SEASON OVERVIEW', COLS);
+  addMetric('Total Brews', brews.length);
+  addMetric('Total Beans', beans.length);
+  addMetric('Date Range', brews.length ? brews[brews.length-1].date + '  to  ' + brews[0].date : '—');
+  addMetric('Average Score', scores.length ? +(scores.reduce((a,b)=>a+b,0)/scores.length).toFixed(1) : '—');
+  addMetric('Best Score', scores.length ? Math.max(...scores) : '—');
+  addMetric('Average EY', eys.length ? +(eys.reduce((a,b)=>a+b,0)/eys.length).toFixed(1) + '%' : '—');
+  addMetric('Best EY', eys.length ? +(Math.max(...eys)).toFixed(1) + '%' : '—');
+  addMetric('Exported', today());
+
+  /* ── Score Progression (all brews chronological) ── */
+  addTitle('SCORE PROGRESSION', COLS);
+  addSection('Score over time — track your improvement', COLS);
+  addSubHdr(['#', 'Date', 'Bean', 'Score', 'Grind', 'Ratio']);
+  const chronoAll = [...brews].filter(b => b.score != null).sort((a,b) => (a.date||'').localeCompare(b.date||''));
+  chronoAll.forEach((b, i) => {
+    const bean = beans.find(bn => bn.id === b.beanId);
+    const ratio = (b.dose && b.water) ? '1:' + (b.water/b.dose).toFixed(1) : '';
+    addData([i+1, b.date||'', bean ? bdn(bean) : '', b.score, b.grind||'', ratio]);
+  });
+
+  /* ── Bean Comparison ── */
+  addTitle('BEAN COMPARISON', COLS);
+  addSection('Performance by bean — which coffees score highest', COLS);
+  addSubHdr(['Bean', 'Brews', 'Avg Score', 'Best Score', 'Avg EY', 'Best EY']);
+  const beanStats = beans.map(bn => {
+    const bb = brews.filter(b => b.beanId === bn.id);
+    const sc = bb.filter(b => b.score != null);
+    const ey = bb.filter(b => b.ey != null);
+    return {
+      name: bdn(bn),
+      count: bb.length,
+      avgScore: sc.length ? +(sc.reduce((a,c)=>a+c.score,0)/sc.length).toFixed(1) : '',
+      bestScore: sc.length ? Math.max(...sc.map(s=>s.score)) : '',
+      avgEY: ey.length ? +(ey.reduce((a,c)=>a+c.ey,0)/ey.length).toFixed(1) : '',
+      bestEY: ey.length ? +(Math.max(...ey.map(e=>e.ey))).toFixed(1) : '',
+    };
+  }).filter(b => b.count > 0).sort((a,b) => (b.avgScore||0) - (a.avgScore||0));
+  beanStats.forEach(b => addData([b.name, b.count, b.avgScore, b.bestScore, b.avgEY, b.bestEY]));
+
+  /* ── Grind vs Score ── */
+  addTitle('GRIND vs SCORE', COLS);
+  addSection('Does finer/coarser grind correlate with better scores?', COLS);
+  addSubHdr(['Bean', 'Grind', 'Score', 'Ratio', 'Temp', 'Time']);
+  const grindData = sortedBrews.filter(b => b.grind && b.score != null).sort((a,b) => parseFloat(a.grind)-parseFloat(b.grind));
+  grindData.forEach(b => {
+    const bean = beans.find(bn => bn.id === b.beanId);
+    const ratio = (b.dose && b.water) ? '1:' + (b.water/b.dose).toFixed(1) : '';
+    addData([bean ? bdn(bean) : '', b.grind, b.score, ratio, b.temp||'', b.totalTime||'']);
+  });
+
+  /* ── DOR vs Score ── */
+  addTitle('DOR vs SCORE', COLS);
+  addSection('How does days off roast affect cup quality?', COLS);
+  addSubHdr(['Bean', 'DOR', 'Score', 'Grind', 'Hot Intensity', 'Cool Intensity']);
+  sortedBrews.forEach(b => {
+    const bean = beans.find(bn => bn.id === b.beanId);
+    if (!bean || !bean.roastDate || !b.date || b.score == null) return;
+    let dor = b.frozen && b.daysOffRoast != null ? b.daysOffRoast : Math.max(0, Math.floor((new Date(b.date+'T12:00:00') - new Date(bean.roastDate+'T12:00:00')) / 86400000));
+    addData([bdn(bean), dor, b.score, b.grind||'', b.hot?.intensity||'', b.cool?.intensity||'']);
+  });
+
+  /* ── Sensory Averages by Bean ── */
+  addTitle('SENSORY PROFILE', COLS);
+  addSection('Average acidity / sweetness / bitterness per bean', COLS);
+  addSubHdr(['Bean', 'Hot Acid', 'Hot Sweet', 'Hot Bitter', 'Cool Acid', 'Cool Sweet']);
+  beans.forEach(bn => {
+    const bb = brews.filter(b => b.beanId === bn.id && b.hot);
+    if (!bb.length) return;
+    const avg = (arr, k) => { const v = arr.filter(b => b[k] != null).map(b => b[k]); return v.length ? +(v.reduce((a,c)=>a+c,0)/v.length).toFixed(1) : ''; };
+    addData([
+      bdn(bn),
+      avg(bb.map(b=>b.hot), 'acidity'),
+      avg(bb.map(b=>b.hot), 'sweetness'),
+      avg(bb.map(b=>b.hot), 'bitterness'),
+      avg(bb.map(b=>b.cool), 'acidity'),
+      avg(bb.map(b=>b.cool), 'sweetness'),
+    ]);
+  });
+
+  /* Build the worksheet */
+  const wsC = XLSX.utils.aoa_to_sheet(chartRows);
+  wsC['!cols'] = [{ wch: 38 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 }];
+  wsC['!rows'] = chartRows.map((r, i) => SECTIONS[i] === 'title' ? { hpt: 32 } : { hpt: 22 });
+
+  /* Apply styles */
+  chartRows.forEach((row, r) => {
+    for (let c = 0; c < COLS; c++) {
+      const addr = XLSX.utils.encode_cell({ r, c });
+      if (!wsC[addr]) wsC[addr] = { v: '', t: 's' };
+      const type = SECTIONS[r];
+      if (type === 'title')   wsC[addr].s = titleStyle;
+      else if (type === 'section') wsC[addr].s = sectionStyle;
+      else if (type === 'metric') wsC[addr].s = c === 0 ? metricLabel : (c === 1 ? metricVal : blankStyle);
+      else if (type === 'subhdr') wsC[addr].s = subHdr;
+      else if (type === 'data')   wsC[addr].s = c === 0 ? dataCell : dataCellR;
+      else wsC[addr].s = blankStyle;
     }
   });
-  ws4['!rows'] = sumData.map((r,i) => r[0]==='BREW LOG SUMMARY' ? {hpt:32} : {hpt:24});
 
-  XLSX.utils.book_append_sheet(wb, ws4, 'Summary');
+  XLSX.utils.book_append_sheet(wb, wsC, 'Charts');
 
   XLSX.writeFile(wb, 'Brew-Log-' + today() + '.xlsx');
   showToast('Exported!');
