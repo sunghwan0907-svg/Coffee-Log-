@@ -1137,39 +1137,16 @@ body {
           </div>
         </div>
       </div>
-      <!-- Cloud Sync -->
+      <!-- Sync Across Devices -->
       <div class="section">
-        <div class="section-header">Cloud Sync</div>
+        <div class="section-header">Sync Across Devices</div>
         <div class="group">
-          <div class="row" style="flex-direction:column;align-items:stretch;gap:8px;padding:14px 18px">
-            <div style="display:flex;align-items:center;gap:10px">
-              <span style="font-size:22px">☁️</span>
-              <div>
-                <div style="font-size:15px;font-weight:600">Sync Across Devices</div>
-                <div style="font-size:13px;color:var(--text3)" id="syncSubtitle">Not connected</div>
-              </div>
-              <span id="syncStatusDot" style="margin-left:auto;width:10px;height:10px;border-radius:50%;background:var(--text3)"></span>
-            </div>
+          <div class="row" style="flex-direction:column;align-items:stretch;gap:6px;padding:14px 18px">
+            <div style="font-size:13px;color:var(--text3);line-height:1.4">Copy your data on one device, send it to yourself, then paste it on the other device.</div>
           </div>
-          <div id="syncSetup" style="padding:10px 18px 14px">
-            <div id="syncNotConnected">
-              <button class="export-btn" style="width:100%;margin:0 0 12px;padding:14px;font-size:16px;font-weight:700" onclick="createSyncRoom()">☁️ Create Sync Code</button>
-              <div style="text-align:center;font-size:14px;font-weight:600;color:var(--text2);margin:12px 0;padding:8px 0;border-top:1px solid var(--sep);border-bottom:1px solid var(--sep)">Already have a code? Enter it below</div>
-              <input id="syncCodeInput" type="text" placeholder="Paste sync code here" style="width:100%;text-align:center;background:var(--bg);border:2px solid var(--sep);border-radius:12px;padding:14px;font-size:18px;font-weight:700;letter-spacing:1px;color:var(--text);outline:none;box-sizing:border-box;margin-bottom:8px;font-family:inherit" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--sep)'">
-              <button class="export-btn" style="width:100%;margin:0;padding:14px;font-size:16px;font-weight:700" onclick="joinSyncRoom()">Connect</button>
-            </div>
-            <div id="syncConnected" style="display:none">
-              <div style="text-align:center;padding:12px;background:var(--fill);border-radius:12px;margin-bottom:12px">
-                <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text3);margin-bottom:6px">Your Sync Code</div>
-                <div id="syncCodeDisplay" style="font-size:20px;font-weight:800;letter-spacing:1px;color:var(--accent);word-break:break-all;padding:0 8px"></div>
-                <div style="font-size:13px;color:var(--text3);margin-top:6px">Enter this on your other device</div>
-              </div>
-              <div style="display:flex;gap:8px">
-                <button class="export-btn" style="flex:1;margin:0" onclick="syncPush()">☁️ Push</button>
-                <button class="export-btn" style="flex:1;margin:0" onclick="syncPull()">📥 Pull</button>
-              </div>
-              <button style="width:100%;margin-top:10px;padding:10px;font-size:13px;color:var(--red);font-weight:600;background:none;border:none;cursor:pointer" onclick="disconnectSync()">Disconnect Sync</button>
-            </div>
+          <div style="display:flex;gap:8px;padding:0 18px 14px">
+            <button class="export-btn" style="flex:1;margin:0;padding:14px;font-size:15px;font-weight:700" onclick="copyAllData()">📋 Copy Data</button>
+            <button class="export-btn" style="flex:1;margin:0;padding:14px;font-size:15px;font-weight:700" onclick="pasteAllData()">📥 Paste Data</button>
           </div>
           <div id="syncLog" style="padding:0 18px 14px;font-size:12px;color:var(--text3);display:none"></div>
         </div>
@@ -3285,36 +3262,8 @@ function setDisp(id, val, fallback) {
 }
 
 /* ──────────────────────────────────────────────────────────────
-   Cloud Sync (zero-setup via jsonblob.com)
+   Sync (copy/paste)
 ────────────────────────────────────────────────────────────── */
-const K_SYNC = 'bl_sync_id';
-const NP_API = 'https://jsonblob.com/api/jsonBlob';
-
-function getSyncId() { return localStorage.getItem(K_SYNC) || ''; }
-function setSyncId(id) { localStorage.setItem(K_SYNC, id); }
-
-function updateSyncUI() {
-  const id = getSyncId();
-  const dot = document.getElementById('syncStatusDot');
-  const sub = document.getElementById('syncSubtitle');
-  const notConn = document.getElementById('syncNotConnected');
-  const conn = document.getElementById('syncConnected');
-  const codeDisp = document.getElementById('syncCodeDisplay');
-
-  if (id) {
-    if (dot) dot.style.background = 'var(--green)';
-    if (sub) sub.textContent = 'Connected';
-    if (notConn) notConn.style.display = 'none';
-    if (conn) conn.style.display = 'block';
-    if (codeDisp) codeDisp.textContent = id;
-  } else {
-    if (dot) dot.style.background = 'var(--text3)';
-    if (sub) sub.textContent = 'Not connected';
-    if (notConn) notConn.style.display = 'block';
-    if (conn) conn.style.display = 'none';
-  }
-}
-
 function syncLog(msg) {
   const el = document.getElementById('syncLog');
   if (!el) return;
@@ -3322,152 +3271,92 @@ function syncLog(msg) {
   el.style.display = msg ? 'block' : 'none';
 }
 
-async function createSyncRoom() {
-  syncLog('Creating…');
+async function copyAllData() {
   try {
-    const data = { brews, beans, equipment: settings, ts: Date.now() };
-    const res = await fetch(NP_API, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify(data),
-    });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-
-    /* jsonblob returns ID in Location header and X-jsonblob-id */
-    let id = res.headers.get('X-jsonblob-id') || '';
-    if (!id) {
-      const loc = res.headers.get('Location') || '';
-      id = loc.split('/').pop();
-    }
-    if (!id) throw new Error('Could not get sync ID — try again');
-
-    setSyncId(id);
-    updateSyncUI();
-    showToast('☁️ Sync code created!');
-    syncLog('Code created — enter it on your other device');
+    const data = { brews, beans, equipment: settings, ts: Date.now(), v: 1 };
+    const json = JSON.stringify(data);
+    const encoded = 'BREWLOG:' + btoa(unescape(encodeURIComponent(json)));
+    await navigator.clipboard.writeText(encoded);
+    const count = brews.length + beans.length;
+    showToast('Copied! ' + count + ' items');
+    syncLog(brews.length + ' brews + ' + beans.length + ' beans copied to clipboard');
   } catch(e) {
-    showToast('Failed to create sync');
-    syncLog('Error: ' + e.message);
+    /* fallback: select a temporary textarea */
+    try {
+      const data = { brews, beans, equipment: settings, ts: Date.now(), v: 1 };
+      const json = JSON.stringify(data);
+      const encoded = 'BREWLOG:' + btoa(unescape(encodeURIComponent(json)));
+      const ta = document.createElement('textarea');
+      ta.value = encoded;
+      ta.style.cssText = 'position:fixed;left:-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      showToast('Copied!');
+      syncLog('Data copied to clipboard');
+    } catch(e2) {
+      showToast('Copy failed');
+      syncLog('Error: ' + e2.message);
+    }
   }
 }
 
-async function joinSyncRoom() {
-  const code = (document.getElementById('syncCodeInput')?.value || '').trim();
-  if (!code) { showToast('Enter a sync code'); return; }
-
-  syncLog('Connecting…');
+async function pasteAllData() {
   try {
-    const res = await fetch(NP_API + '/' + code, {
-      headers: { 'Accept': 'application/json' },
-    });
-    if (!res.ok) {
-      if (res.status === 404) showToast('Invalid sync code');
-      else showToast('Connection failed');
-      syncLog('Error: code not found');
+    let text = '';
+    try {
+      text = await navigator.clipboard.readText();
+    } catch(e) {
+      /* clipboard API denied — prompt user */
+      text = prompt('Paste your sync data here:') || '';
+    }
+    text = text.trim();
+    if (!text) { showToast('Nothing to paste'); return; }
+
+    if (!text.startsWith('BREWLOG:')) {
+      showToast('Invalid sync data');
+      syncLog('Paste a code that starts with BREWLOG:');
       return;
     }
 
-    const data = await res.json();
-    setSyncId(code);
-    mergeRemoteData(data);
-    updateSyncUI();
-    showToast('☁️ Connected & synced!');
-    syncLog('Last sync: ' + new Date().toLocaleTimeString());
+    const json = decodeURIComponent(escape(atob(text.slice(8))));
+    const data = JSON.parse(json);
+
+    let added = 0;
+    if (data.brews && Array.isArray(data.brews)) {
+      const localIds = new Set(brews.map(b => b.id));
+      data.brews.forEach(b => { if (!localIds.has(b.id)) { brews.push(b); added++; } });
+      persist(K_BREWS, brews);
+    }
+    if (data.beans && Array.isArray(data.beans)) {
+      const localIds = new Set(beans.map(b => b.id));
+      data.beans.forEach(b => { if (!localIds.has(b.id)) { beans.push(b); added++; } });
+      persist(K_BEANS, beans);
+    }
+    if (data.equipment) {
+      ['grinders','brewers','filters'].forEach(k => {
+        if (data.equipment[k]) {
+          settings[k] = [...new Set([...(settings[k]||[]), ...data.equipment[k]])];
+        }
+      });
+      persist(K_SETTINGS, settings);
+      renderEquipLists();
+    }
+    renderBeans();
+    renderDataset();
+    renderStats();
+    updateDataStatus();
+    showToast('Synced! ' + added + ' new items');
+    syncLog('Imported ' + added + ' new item' + (added !== 1 ? 's' : '') + ' from ' + new Date(data.ts).toLocaleString());
   } catch(e) {
-    showToast('Connection failed');
+    showToast('Import failed');
     syncLog('Error: ' + e.message);
   }
 }
 
-function disconnectSync() {
-  localStorage.removeItem(K_SYNC);
-  updateSyncUI();
-  syncLog('');
-  showToast('Sync disconnected');
-}
-
-async function syncPush() {
-  const id = getSyncId();
-  if (!id) { showToast('Set up sync first'); return; }
-
-  syncLog('Pushing…');
-  try {
-    const data = { brews, beans, equipment: settings, ts: Date.now() };
-    const res = await fetch(NP_API + '/' + id, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify(data),
-    });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    showToast('☁️ Pushed to cloud');
-    syncLog('Last push: ' + new Date().toLocaleTimeString());
-  } catch(e) {
-    showToast('Push failed');
-    syncLog('Error: ' + e.message);
-  }
-}
-
-async function syncPull() {
-  const id = getSyncId();
-  if (!id) return;
-
-  syncLog('Pulling…');
-  try {
-    const res = await fetch(NP_API + '/' + id, {
-      headers: { 'Accept': 'application/json' },
-    });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const data = await res.json();
-    mergeRemoteData(data);
-    showToast('☁️ Synced from cloud');
-    syncLog('Last pull: ' + new Date().toLocaleTimeString());
-  } catch(e) {
-    syncLog('Pull error: ' + e.message);
-  }
-}
-
-function mergeRemoteData(data) {
-  let added = 0;
-  if (data.brews && Array.isArray(data.brews)) {
-    const localIds = new Set(brews.map(b => b.id));
-    data.brews.forEach(b => { if (!localIds.has(b.id)) { brews.push(b); added++; } });
-    /* also update existing items if remote is newer */
-    persist(K_BREWS, brews);
-  }
-  if (data.beans && Array.isArray(data.beans)) {
-    const localIds = new Set(beans.map(b => b.id));
-    data.beans.forEach(b => { if (!localIds.has(b.id)) { beans.push(b); added++; } });
-    persist(K_BEANS, beans);
-  }
-  if (data.equipment) {
-    ['grinders','brewers','filters'].forEach(k => {
-      if (data.equipment[k]) {
-        settings[k] = [...new Set([...(settings[k]||[]), ...data.equipment[k]])];
-      }
-    });
-    persist(K_SETTINGS, settings);
-    renderEquipLists();
-  }
-  renderBeans();
-  renderDataset();
-  renderStats();
-  updateDataStatus();
-  if (added > 0) syncLog(`Merged ${added} new item${added>1?'s':''}`);
-}
-
-/* auto-push after saving (debounced) */
-let _syncTimer = null;
-function autoSync() {
-  if (!getSyncId()) return;
-  clearTimeout(_syncTimer);
-  _syncTimer = setTimeout(syncPush, 2000);
-}
-
-/* restore sync state on load + auto-pull */
-function initSync() {
-  updateSyncUI();
-  if (getSyncId()) syncPull();
-}
+function autoSync() {}
+function initSync() {}
 </script>
 </body>
 </html>
