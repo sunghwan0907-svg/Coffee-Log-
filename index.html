@@ -369,6 +369,31 @@ body {
   box-shadow: 0 1px 4px rgba(0,0,0,0.1);
 }
 
+.int-ctrl {
+  display: flex;
+  background: var(--fill);
+  border-radius: 10px;
+  padding: 3px;
+  gap: 2px;
+}
+.int-btn {
+  flex: 1;
+  padding: 8px 2px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text3);
+  transition: all 0.15s;
+  line-height: 1.2;
+  text-align: center;
+  white-space: nowrap;
+}
+.int-btn.active {
+  background: var(--bg2);
+  color: var(--text);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+}
+
 /* ── Score ────────────────────────────────────────────────────── */
 .score-row {
   display: flex;
@@ -1028,14 +1053,10 @@ body {
             <div class="sensory-dot"></div>
             <div class="sensory-title">Aroma</div>
           </div>
-          <div class="intensity-row">
-            <span class="intensity-label">Intensity</span>
-            <input class="intensity-slider" type="range" min="1" max="9" value="5" id="aromaSlider" oninput="onSlider(this,'aroma')">
-            <span class="intensity-value" id="aromaVal">5</span>
-          </div>
+          <div class="seg-row"><div class="seg-label">Intensity</div><div class="int-ctrl" id="aromaInt"></div></div>
           <div class="row textarea-row" style="border-bottom:none">
             <span class="row-label">Notes</span>
-            <textarea class="row-textarea" id="aromaNotes" placeholder="Describe the aroma…" rows="2"></textarea>
+            <textarea class="row-textarea" id="aromaNotes" placeholder="" rows="2"></textarea>
           </div>
         </div>
       </div>
@@ -1048,12 +1069,13 @@ body {
             <div class="sensory-dot"></div>
             <div class="sensory-title">Hot</div>
           </div>
+          <div class="seg-row"><div class="seg-label">Intensity</div><div class="int-ctrl" id="hInt"></div></div>
           <div class="seg-row"><div class="seg-label">Acidity</div><div class="seg-ctrl" id="hAcid"></div></div>
           <div class="seg-row"><div class="seg-label">Sweetness</div><div class="seg-ctrl" id="hSweet"></div></div>
           <div class="seg-row"><div class="seg-label">Bitterness</div><div class="seg-ctrl" id="hBitter"></div></div>
           <div class="row textarea-row" style="border-bottom:none">
             <span class="row-label">Notes</span>
-            <textarea class="row-textarea" id="hotNotes" placeholder="Describe hot cup flavours…" rows="2"></textarea>
+            <textarea class="row-textarea" id="hotNotes" placeholder="" rows="2"></textarea>
           </div>
         </div>
       </div>
@@ -1066,12 +1088,13 @@ body {
             <div class="sensory-dot"></div>
             <div class="sensory-title">Cool</div>
           </div>
+          <div class="seg-row"><div class="seg-label">Intensity</div><div class="int-ctrl" id="cInt"></div></div>
           <div class="seg-row"><div class="seg-label">Acidity</div><div class="seg-ctrl" id="cAcid"></div></div>
           <div class="seg-row"><div class="seg-label">Sweetness</div><div class="seg-ctrl" id="cSweet"></div></div>
           <div class="seg-row"><div class="seg-label">Bitterness</div><div class="seg-ctrl" id="cBitter"></div></div>
           <div class="row textarea-row" style="border-bottom:none">
             <span class="row-label">Notes</span>
-            <textarea class="row-textarea" id="coolNotes" placeholder="Describe cool cup flavours…" rows="2"></textarea>
+            <textarea class="row-textarea" id="coolNotes" placeholder="" rows="2"></textarea>
           </div>
         </div>
       </div>
@@ -1388,6 +1411,8 @@ let selBrewer    = null;
 let selFilter    = null;
 let cvRows       = [];
 let ss           = { hA:5, hS:5, hB:5, cA:5, cS:5, cB:5 }; // sensory state
+let intState     = { aroma: '', hot: '', cool: '' }; // intensity: Low, Med-Low, Med, Med-High, High
+const INT_LEVELS = ['Low', 'Med-Low', 'Med', 'Med-High', 'High'];
 let editBeanId   = null;
 let editBrewId   = null;
 let delBrewId    = null;
@@ -1621,13 +1646,8 @@ function recalcEY() {
 /* ──────────────────────────────────────────────────────────────
    Aroma slider
 ────────────────────────────────────────────────────────────── */
-function initSlider() { onSlider(document.getElementById('aromaSlider'), 'aroma'); }
-
-function onSlider(el, key) {
-  const pct = ((el.value - 1) / 8) * 100;
-  el.style.setProperty('--pct', pct + '%');
-  document.getElementById(key + 'Val').textContent = el.value;
-}
+function initSlider() {} // legacy stub
+function onSlider() {} // legacy stub
 
 /* ──────────────────────────────────────────────────────────────
    Segmented controls
@@ -1656,6 +1676,31 @@ function buildSegControls() {
       };
       el.appendChild(b);
     }
+  });
+  buildIntControls();
+}
+
+const INT_DEFS = [
+  { id: 'aromaInt', key: 'aroma' },
+  { id: 'hInt',     key: 'hot' },
+  { id: 'cInt',     key: 'cool' },
+];
+
+function buildIntControls() {
+  INT_DEFS.forEach(({ id, key }) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.innerHTML = '';
+    INT_LEVELS.forEach(lvl => {
+      const b = document.createElement('button');
+      b.className = 'int-btn' + (intState[key] === lvl ? ' active' : '');
+      b.textContent = lvl;
+      b.onclick = () => {
+        intState[key] = lvl;
+        el.querySelectorAll('.int-btn').forEach(x => x.classList.toggle('active', x.textContent === lvl));
+      };
+      el.appendChild(b);
+    });
   });
 }
 
@@ -1848,14 +1893,16 @@ function saveBrew() {
     frozen: brewFrozen,
     customVars: cvRows.filter(r => r.k).map(r => ({ ...r })),
     aroma: {
-      intensity: parseInt(document.getElementById('aromaSlider').value),
+      intensity: intState.aroma || '',
       notes: v('aromaNotes'),
     },
     hot: {
+      intensity: intState.hot || '',
       acidity: ss.hA, sweetness: ss.hS, bitterness: ss.hB,
       notes: v('hotNotes'),
     },
     cool: {
+      intensity: intState.cool || '',
       acidity: ss.cA, sweetness: ss.cS, bitterness: ss.cB,
       notes: v('coolNotes'),
     },
@@ -1895,8 +1942,7 @@ function resetLogForm() {
   brewFrozen = false; brewDOR = null;
   document.getElementById('dorInput').value = '';
   updateDOR();
-  document.getElementById('aromaSlider').value = 5;
-  initSlider();
+  intState = { aroma: '', hot: '', cool: '' };
   ss = { hA:5, hS:5, hB:5, cA:5, cS:5, cB:5 };
   buildSegControls();
   renderCV();
@@ -2292,8 +2338,11 @@ function editBrewOpen(e, id) {
   setV('hotNotes',   brew.hot?.notes);
   setV('coolNotes',  brew.cool?.notes);
 
-  document.getElementById('aromaSlider').value = brew.aroma?.intensity || 5;
-  initSlider();
+  intState = {
+    aroma: brew.aroma?.intensity || '',
+    hot:   brew.hot?.intensity || '',
+    cool:  brew.cool?.intensity || '',
+  };
 
   if (brew.hot)  { ss.hA = brew.hot.acidity||5;  ss.hS = brew.hot.sweetness||5;  ss.hB = brew.hot.bitterness||5; }
   if (brew.cool) { ss.cA = brew.cool.acidity||5; ss.cS = brew.cool.sweetness||5; ss.cB = brew.cool.bitterness||5; }
@@ -2354,8 +2403,7 @@ function cloneBrew(e, id) {
   setV('hotNotes',   '');
   setV('coolNotes',  '');
 
-  document.getElementById('aromaSlider').value = 5;
-  initSlider();
+  intState = { aroma: '', hot: '', cool: '' };
   ss = { hA:5, hS:5, hB:5, cA:5, cS:5, cB:5 };
   buildSegControls();
 
@@ -3392,7 +3440,7 @@ function exportXLSX() {
       'Bev Wt': num(b.beverageWeight),
       'TDS': num(b.tds),
       'EY': num(b.ey),
-      'Aroma': num(b.aroma?.intensity),
+      'Aroma': b.aroma?.intensity || '',
       'Aroma Notes': b.aroma?.notes || '',
       'H-Acid': num(b.hot?.acidity),
       'H-Sweet': num(b.hot?.sweetness),
