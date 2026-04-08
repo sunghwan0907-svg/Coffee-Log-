@@ -1256,6 +1256,7 @@ body {
     <div class="sheet-scroll" style="padding-bottom:env(safe-area-inset-bottom)">
       <div class="group" style="margin:16px;border-radius:12px;overflow:hidden">
         <div class="row"><span class="row-label">Roaster</span><input class="row-input" id="bRoaster" type="text" placeholder="Required"></div>
+        <div class="row"><span class="row-label">Farm</span><input class="row-input" id="bFarmName" type="text" placeholder="e.g. Adrian Lasso"></div>
         <div class="row"><span class="row-label">Region</span><input class="row-input" id="bFarm" type="text" placeholder="e.g. Ethiopia"></div>
         <div class="row"><span class="row-label">Processing</span><input class="row-input" id="bProc" type="text" placeholder="e.g. Washed"></div>
         <div class="row"><span class="row-label">Varietal</span><input class="row-input" id="bVarietal" type="text" placeholder="e.g. Gesha"></div>
@@ -1712,7 +1713,7 @@ function pickBean(id) {
 }
 
 function bdn(b) {
-  return [b.roaster, b.farm, b.processing, b.varietal].filter(Boolean).join(' · ');
+  return [b.roaster, b.farmName, b.processing, b.varietal].filter(Boolean).join(' · ');
 }
 
 function beanAge(b, refDate) {
@@ -1882,6 +1883,7 @@ function renderBeans() {
         ${b.farm       ? `<span class="tag tag-f">${esc(b.farm)}</span>`       : ''}
         ${b.processing ? `<span class="tag tag-p">${esc(b.processing)}</span>` : ''}
         ${b.varietal   ? `<span class="tag tag-v">${esc(b.varietal)}</span>`   : ''}
+        ${b.farmName   ? `<span class="tag" style="background:rgba(139,106,174,0.12);color:#8b6aae">${esc(b.farmName)}</span>` : ''}
         ${b.other      ? `<span class="tag tag-o">${esc(b.other)}</span>`      : ''}
       </div>
       ${age ? `<div class="bean-age${age.frozen?' bean-age-frozen':''}">${age.frozen?'❄ Frozen · Day '+age.days:'Day '+age.days+' post-roast'}</div>` : ''}
@@ -1893,7 +1895,7 @@ function openAddBean() {
   editBeanId = null;
   document.getElementById('addBeanTitle').textContent = 'Add Bean';
   document.getElementById('saveBeanBtn').textContent  = 'Add Bean';
-  ['bRoaster','bFarm','bProc','bVarietal','bOther','bRoastDate','bFrozenDay'].forEach(id => document.getElementById(id).value = '');
+  ['bRoaster','bFarmName','bFarm','bProc','bVarietal','bOther','bRoastDate','bFrozenDay'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('delBeanBtn').style.display = 'none';
   openSheet('sAddBean');
 }
@@ -1905,6 +1907,7 @@ function editBeanOpen(id) {
   document.getElementById('addBeanTitle').textContent = 'Edit Bean';
   document.getElementById('saveBeanBtn').textContent  = 'Save Changes';
   document.getElementById('bRoaster').value  = b.roaster    || '';
+  document.getElementById('bFarmName').value = b.farmName   || '';
   document.getElementById('bFarm').value     = b.farm       || '';
   document.getElementById('bProc').value     = b.processing || '';
   document.getElementById('bVarietal').value = b.varietal   || '';
@@ -1921,6 +1924,7 @@ function saveBean() {
   const bean = {
     id: editBeanId || uid(),
     roaster,
+    farmName:   document.getElementById('bFarmName').value.trim(),
     farm:       document.getElementById('bFarm').value.trim(),
     processing: document.getElementById('bProc').value.trim(),
     varietal:   document.getElementById('bVarietal').value.trim(),
@@ -3150,6 +3154,7 @@ function exportXLSX() {
     const eyVals = bBrews.filter(br => br.ey != null);
     return {
       Roaster: b.roaster || '',
+      Farm: b.farmName || '',
       Region: b.farm || '',
       Processing: b.processing || '',
       Varietal: b.varietal || '',
