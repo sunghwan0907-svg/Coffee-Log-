@@ -204,10 +204,10 @@ body {
 .row {
   display: flex;
   align-items: center;
-  padding: 13px 18px;
+  padding: 14px 20px;
   border-bottom: 1px solid var(--sep);
-  min-height: 48px;
-  gap: 10px;
+  min-height: 52px;
+  gap: 12px;
 }
 .row:last-child { border-bottom: none; }
 .row-label {
@@ -221,11 +221,12 @@ body {
   flex: 1;
   border: none;
   background: none;
-  font-size: 15px;
+  font-size: 16px;
   color: var(--text);
   text-align: right;
   outline: none;
   min-width: 0;
+  padding: 6px 4px;
 }
 .row-input::placeholder { color: var(--text3); }
 .row-value {
@@ -936,7 +937,7 @@ body {
         <div class="group">
           <div class="row">
             <span class="row-label">Grind size</span>
-            <input class="row-input" id="lGrind" type="text" placeholder="">
+            <input class="row-input" id="lGrind" type="text" inputmode="decimal" placeholder="">
           </div>
           <div class="row">
             <span class="row-label">Dose</span>
