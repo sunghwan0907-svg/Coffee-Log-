@@ -965,17 +965,35 @@ body {
         </div>
       </div>
 
-      <!-- Notes (after recipe, before extraction) -->
+      <!-- Recipe notes -->
       <div class="section">
-        <div class="section-header">Notes</div>
+        <div class="section-header">Recipe</div>
         <div class="group">
-          <div class="row textarea-row">
-            <span class="row-label">Recipe &amp; thoughts</span>
-            <textarea class="row-textarea" id="lNotes" placeholder="Technique, water recipe, observations…" rows="3"></textarea>
-          </div>
           <div class="row textarea-row" style="border-bottom:none">
-            <span class="row-label">Adjust next</span>
-            <textarea class="row-textarea" id="lAdjust" placeholder="What to change next time…" rows="2"></textarea>
+            <span class="row-label">Water recipe &amp; technique</span>
+            <textarea class="row-textarea" id="lRecipeNotes" placeholder="" rows="2"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- Thoughts -->
+      <div class="section">
+        <div class="section-header">Thoughts</div>
+        <div class="group">
+          <div class="row textarea-row" style="border-bottom:none">
+            <span class="row-label">Observations</span>
+            <textarea class="row-textarea" id="lNotes" placeholder="" rows="2"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- Adjust next -->
+      <div class="section">
+        <div class="section-header">Adjust Next</div>
+        <div class="group">
+          <div class="row textarea-row" style="border-bottom:none">
+            <span class="row-label">What to change</span>
+            <textarea class="row-textarea" id="lAdjust" placeholder="" rows="2"></textarea>
           </div>
         </div>
       </div>
@@ -1395,7 +1413,7 @@ function saveDraft() {
       cvRows: cvRows.map(r => ({ ...r })),
       frozen: brewFrozen, dor: brewDOR,
     };
-    ['lName','lDose','lWater','lTemp','lGrind','lBloom','lTime','lBev','lTDS','lScore','lNotes','lAdjust','aromaNotes','hotNotes','coolNotes']
+    ['lName','lDose','lWater','lTemp','lGrind','lBloom','lTime','lBev','lTDS','lScore','lRecipeNotes','lNotes','lAdjust','aromaNotes','hotNotes','coolNotes']
       .forEach(id => { const el = document.getElementById(id); if (el) draft.fields[id] = el.value; });
     persist(K_DRAFT, draft);
   } catch(e) {}
@@ -1821,6 +1839,7 @@ function saveBrew() {
     beverageWeight: bev || null,
     tds:   tds || null,
     ey,
+    recipeNotes: v('lRecipeNotes'),
     notes:  v('lNotes'),
     adjust: v('lAdjust'),
     score:  nv('lScore'),
@@ -1861,7 +1880,7 @@ function saveBrew() {
 function resetLogForm() {
   selBean = selGrinder = selBrewer = selFilter = null;
   cvRows = [];
-  ['lName','lDose','lWater','lTemp','lGrind','lBloom','lTime','lBev','lTDS','lScore','lNotes','lAdjust','aromaNotes','hotNotes','coolNotes']
+  ['lName','lDose','lWater','lTemp','lGrind','lBloom','lTime','lBev','lTDS','lScore','lRecipeNotes','lNotes','lAdjust','aromaNotes','hotNotes','coolNotes']
     .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   document.getElementById('beanDisplay').textContent    = 'Select bean';
   document.getElementById('beanDisplay').style.color    = 'var(--text3)';
@@ -2265,6 +2284,7 @@ function editBrewOpen(e, id) {
   setV('lBev',   brew.beverageWeight);
   setV('lTDS',   brew.tds);
   setV('lScore', brew.score);
+  setV('lRecipeNotes', brew.recipeNotes);
   setV('lNotes', brew.notes);
   setV('lAdjust',brew.adjust);
   setV('aromaNotes', brew.aroma?.notes);
@@ -2326,6 +2346,7 @@ function cloneBrew(e, id) {
   setV('lBev',   '');  // clear extraction — new brew
   setV('lTDS',   '');
   setV('lScore', '');
+  setV('lRecipeNotes', brew.recipeNotes);
   setV('lNotes', brew.notes);
   setV('lAdjust', brew.adjust);
   setV('aromaNotes', '');
@@ -3380,7 +3401,8 @@ function exportXLSX() {
       'C-Sweet': num(b.cool?.sweetness),
       'C-Bitter': num(b.cool?.bitterness),
       'Cool Notes': b.cool?.notes || '',
-      'Notes': b.notes || '',
+      'Recipe Notes': b.recipeNotes || '',
+      'Thoughts': b.notes || '',
       'Adjustments': b.adjust || '',
     };
   });
