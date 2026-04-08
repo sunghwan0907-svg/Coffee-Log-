@@ -3246,38 +3246,46 @@ function exportXLSX() {
     return {
       '#': i + 1,
       'Date': b.date || '',
-      'Bean': bean ? bdn(bean) : '',
+      'Session': b.name || '',
+      'Score': num(b.score),
+      /* Bean info */
       'Roaster': bean?.roaster || '',
+      'Farm': bean?.farmName || '',
       'Region': bean?.farm || '',
-      'Varietal': bean?.varietal || '',
       'Processing': bean?.processing || '',
-      'Days Off Roast': dor != null ? dor : '',
-      'Frozen': b.frozen ? 'Yes' : 'No',
-      'Dose (g)': num(b.dose),
-      'Water (g)': num(b.water),
-      'Ratio': ratio,
-      'Temp (°C)': num(b.temp),
+      'Varietal': bean?.varietal || '',
+      'Other': bean?.other || '',
+      'DOR': dor != null ? dor : '',
+      'Frozen': b.frozen ? 'Y' : '',
+      /* Recipe — matches input order */
       'Grind': b.grind || '',
-      'Bloom (s)': num(b.bloom),
-      'Total Time': b.totalTime || '',
-      'Bev Weight (g)': num(b.beverageWeight),
-      'TDS (%)': num(b.tds),
-      'EY (%)': num(b.ey),
-      'Brewer': b.brewer || '',
+      'Dose': num(b.dose),
+      'Water': num(b.water),
+      'Ratio': ratio,
+      'Temp': num(b.temp),
+      'Bloom': num(b.bloom),
+      'Time': b.totalTime || '',
+      /* Equipment */
       'Grinder': b.grinder || '',
+      'Brewer': b.brewer || '',
       'Filter': b.filter || '',
-      'Aroma Intensity (1-9)': num(b.aroma?.intensity),
+      /* Extraction */
+      'Bev Wt': num(b.beverageWeight),
+      'TDS': num(b.tds),
+      'EY': num(b.ey),
+      /* Sensory */
+      'Aroma': num(b.aroma?.intensity),
       'Aroma Notes': b.aroma?.notes || '',
-      'Hot Acidity (1-9)': num(b.hot?.acidity),
-      'Hot Sweetness (1-9)': num(b.hot?.sweetness),
-      'Hot Bitterness (1-9)': num(b.hot?.bitterness),
-      'Hot Tasting Notes': b.hot?.notes || '',
-      'Cool Acidity (1-9)': num(b.cool?.acidity),
-      'Cool Sweetness (1-9)': num(b.cool?.sweetness),
-      'Cool Bitterness (1-9)': num(b.cool?.bitterness),
-      'Cool Tasting Notes': b.cool?.notes || '',
-      'Overall Score (/10)': num(b.score),
-      'Recipe & Thoughts': b.notes || '',
+      'H-Acid': num(b.hot?.acidity),
+      'H-Sweet': num(b.hot?.sweetness),
+      'H-Bitter': num(b.hot?.bitterness),
+      'Hot Notes': b.hot?.notes || '',
+      'C-Acid': num(b.cool?.acidity),
+      'C-Sweet': num(b.cool?.sweetness),
+      'C-Bitter': num(b.cool?.bitterness),
+      'Cool Notes': b.cool?.notes || '',
+      /* Notes */
+      'Notes': b.notes || '',
       'Adjustments': b.adjust || '',
     };
   });
@@ -3288,30 +3296,31 @@ function exportXLSX() {
     const bBrews = brews.filter(br => br.beanId === b.id);
     const scored = bBrews.filter(br => br.score != null);
     const eyVals = bBrews.filter(br => br.ey != null);
+    const bestBrew = scored.length ? [...scored].sort((a,c) => c.score - a.score)[0] : null;
     return {
-      Roaster: b.roaster || '',
-      Farm: b.farmName || '',
-      Region: b.farm || '',
-      Processing: b.processing || '',
-      Varietal: b.varietal || '',
-      Other: b.other || '',
+      'Roaster': b.roaster || '',
+      'Farm': b.farmName || '',
+      'Region': b.farm || '',
+      'Processing': b.processing || '',
+      'Varietal': b.varietal || '',
+      'Other': b.other || '',
       'Roast Date': b.roastDate || '',
-      'Frozen At Day': b.frozenDay != null ? b.frozenDay : '',
-      'Total Brews': bBrews.length,
+      'Frozen Day': b.frozenDay != null ? b.frozenDay : '',
+      'Brews': bBrews.length,
       'Avg Score': scored.length ? +(scored.reduce((a,c) => a + c.score, 0) / scored.length).toFixed(1) : '',
       'Best Score': scored.length ? Math.max(...scored.map(s => s.score)) : '',
-      'Avg EY (%)': eyVals.length ? +(eyVals.reduce((a,c) => a + c.ey, 0) / eyVals.length).toFixed(1) : '',
-      'Best EY (%)': eyVals.length ? +(Math.max(...eyVals.map(e => e.ey))).toFixed(1) : '',
-      'Best Recipe': (() => {
-        const best = scored.sort((a,b) => b.score - a.score)[0];
-        if (!best) return '';
-        return [best.dose+'g', best.water+'g', best.temp?best.temp+'°':'', best.grind, best.totalTime].filter(Boolean).join(' / ');
-      })(),
+      'Avg EY': eyVals.length ? +(eyVals.reduce((a,c) => a + c.ey, 0) / eyVals.length).toFixed(1) : '',
+      'Best EY': eyVals.length ? +(Math.max(...eyVals.map(e => e.ey))).toFixed(1) : '',
+      'Best Grind': bestBrew?.grind || '',
+      'Best Dose': num(bestBrew?.dose),
+      'Best Water': num(bestBrew?.water),
+      'Best Temp': num(bestBrew?.temp),
+      'Best Time': bestBrew?.totalTime || '',
     };
   });
-  addSheet('Bean Library', beanRows);
+  addSheet('Beans', beanRows);
 
-  /* ── 3. PER-BEAN BREAKDOWN (each bean's brews grouped) ── */
+  /* ── 3. PER-BEAN BREAKDOWN (grouped by bean) ── */
   const breakdownRows = [];
   beans.forEach(bean => {
     const bBrews = sortedBrews.filter(b => b.beanId === bean.id);
@@ -3319,27 +3328,27 @@ function exportXLSX() {
     bBrews.forEach(b => {
       const dor = getDOR(bean, b);
       breakdownRows.push({
-        Bean: bdn(bean),
-        Roaster: bean.roaster || '',
-        Date: b.date || '',
-        'Days Off Roast': dor != null ? dor : '',
-        'Dose (g)': num(b.dose),
-        'Water (g)': num(b.water),
-        'Ratio': (b.dose && b.water) ? +(b.water/b.dose).toFixed(1) : '',
-        'Temp (°C)': num(b.temp),
+        'Bean': bdn(bean),
+        'Date': b.date || '',
+        'DOR': dor != null ? dor : '',
+        'Score': num(b.score),
         'Grind': b.grind || '',
-        'Total Time': b.totalTime || '',
-        'TDS (%)': num(b.tds),
-        'EY (%)': num(b.ey),
-        'Score (/10)': num(b.score),
+        'Dose': num(b.dose),
+        'Water': num(b.water),
+        'Ratio': (b.dose && b.water) ? +(b.water/b.dose).toFixed(1) : '',
+        'Temp': num(b.temp),
+        'Bloom': num(b.bloom),
+        'Time': b.totalTime || '',
+        'TDS': num(b.tds),
+        'EY': num(b.ey),
         'Notes': b.notes || '',
         'Adjustments': b.adjust || '',
       });
     });
   });
-  addSheet('Per-Bean Breakdown', breakdownRows);
+  addSheet('By Bean', breakdownRows);
 
-  /* ── 4. SUMMARY DASHBOARD ── */
+  /* ── 4. SUMMARY ── */
   const scores = brews.filter(b => b.score != null).map(b => b.score);
   const eys = brews.filter(b => b.ey != null).map(b => b.ey);
   const topBean = (() => {
@@ -3348,17 +3357,17 @@ function exportXLSX() {
       const s = brews.filter(b => b.beanId === bn.id && b.score != null);
       if (s.length >= 1) { const avg = s.reduce((a,c) => a+c.score,0)/s.length; if (avg > bestAvg) { bestAvg = avg; best = bn; } }
     });
-    return best ? bdn(best) + ' (' + bestAvg.toFixed(1) + ')' : 'N/A';
+    return best ? bdn(best) + ' (' + bestAvg.toFixed(1) + ')' : '—';
   })();
   const summaryRows = [
     { Metric: 'Total Brews', Value: brews.length },
     { Metric: 'Total Beans', Value: beans.length },
-    { Metric: 'Average Score', Value: scores.length ? +(scores.reduce((a,b)=>a+b,0)/scores.length).toFixed(1) : 'N/A' },
-    { Metric: 'Best Score', Value: scores.length ? Math.max(...scores) : 'N/A' },
-    { Metric: 'Average EY (%)', Value: eys.length ? +(eys.reduce((a,b)=>a+b,0)/eys.length).toFixed(1) : 'N/A' },
-    { Metric: 'Best EY (%)', Value: eys.length ? +(Math.max(...eys)).toFixed(1) : 'N/A' },
-    { Metric: 'Top Bean (Avg Score)', Value: topBean },
-    { Metric: 'Date Range', Value: brews.length ? brews[brews.length-1].date + ' → ' + brews[0].date : 'N/A' },
+    { Metric: 'Avg Score', Value: scores.length ? +(scores.reduce((a,b)=>a+b,0)/scores.length).toFixed(1) : '—' },
+    { Metric: 'Best Score', Value: scores.length ? Math.max(...scores) : '—' },
+    { Metric: 'Avg EY', Value: eys.length ? +(eys.reduce((a,b)=>a+b,0)/eys.length).toFixed(1) : '—' },
+    { Metric: 'Best EY', Value: eys.length ? +(Math.max(...eys)).toFixed(1) : '—' },
+    { Metric: 'Top Bean', Value: topBean },
+    { Metric: 'Date Range', Value: brews.length ? brews[brews.length-1].date + ' → ' + brews[0].date : '—' },
     { Metric: 'Exported', Value: today() },
   ];
   addSheet('Summary', summaryRows);
