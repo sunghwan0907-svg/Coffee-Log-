@@ -1153,24 +1153,22 @@ body {
           </div>
           <div id="syncSetup" style="padding:10px 18px 14px">
             <div id="syncNotConnected">
-              <button class="export-btn" style="width:100%;margin:0 0 8px" onclick="createSyncRoom()">Create Sync Code</button>
-              <div style="text-align:center;font-size:13px;color:var(--text3);margin:8px 0">— or enter code from other device —</div>
-              <div style="display:flex;gap:8px">
-                <input id="syncCodeInput" class="row-input" type="text" placeholder="Enter sync code" style="text-align:center;background:var(--fill);border-radius:10px;padding:10px 12px;flex:1;font-size:16px;font-weight:700;letter-spacing:2px">
-                <button class="export-btn" style="margin:0;white-space:nowrap" onclick="joinSyncRoom()">Connect</button>
-              </div>
+              <button class="export-btn" style="width:100%;margin:0 0 12px;padding:14px;font-size:16px;font-weight:700" onclick="createSyncRoom()">☁️ Create Sync Code</button>
+              <div style="text-align:center;font-size:14px;font-weight:600;color:var(--text2);margin:12px 0;padding:8px 0;border-top:1px solid var(--sep);border-bottom:1px solid var(--sep)">Already have a code? Enter it below</div>
+              <input id="syncCodeInput" type="text" placeholder="Paste sync code here" style="width:100%;text-align:center;background:var(--bg);border:2px solid var(--sep);border-radius:12px;padding:14px;font-size:18px;font-weight:700;letter-spacing:1px;color:var(--text);outline:none;box-sizing:border-box;margin-bottom:8px;font-family:inherit" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--sep)'">
+              <button class="export-btn" style="width:100%;margin:0;padding:14px;font-size:16px;font-weight:700" onclick="joinSyncRoom()">Connect</button>
             </div>
             <div id="syncConnected" style="display:none">
-              <div style="text-align:center;padding:8px 0">
+              <div style="text-align:center;padding:12px;background:var(--fill);border-radius:12px;margin-bottom:12px">
                 <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text3);margin-bottom:6px">Your Sync Code</div>
-                <div id="syncCodeDisplay" style="font-size:28px;font-weight:800;letter-spacing:3px;color:var(--accent)"></div>
-                <div style="font-size:12px;color:var(--text3);margin-top:4px">Enter this on your other device</div>
+                <div id="syncCodeDisplay" style="font-size:20px;font-weight:800;letter-spacing:1px;color:var(--accent);word-break:break-all;padding:0 8px"></div>
+                <div style="font-size:13px;color:var(--text3);margin-top:6px">Enter this on your other device</div>
               </div>
-              <div style="display:flex;gap:8px;margin-top:12px">
+              <div style="display:flex;gap:8px">
                 <button class="export-btn" style="flex:1;margin:0" onclick="syncPush()">☁️ Push</button>
                 <button class="export-btn" style="flex:1;margin:0" onclick="syncPull()">📥 Pull</button>
               </div>
-              <button style="width:100%;margin-top:8px;padding:10px;font-size:13px;color:var(--red);font-weight:600;background:none;border:none;cursor:pointer" onclick="disconnectSync()">Disconnect Sync</button>
+              <button style="width:100%;margin-top:10px;padding:10px;font-size:13px;color:var(--red);font-weight:600;background:none;border:none;cursor:pointer" onclick="disconnectSync()">Disconnect Sync</button>
             </div>
           </div>
           <div id="syncLog" style="padding:0 18px 14px;font-size:12px;color:var(--text3);display:none"></div>
@@ -1230,6 +1228,7 @@ body {
     <button class="tab-btn active" data-tab="log"      onclick="goTab('log')">      <span class="tab-icon">☕</span><span class="tab-label">Log</span></button>
     <button class="tab-btn"        data-tab="bean"     onclick="goTab('bean')">     <span class="tab-icon">🌱</span><span class="tab-label">Bean</span></button>
     <button class="tab-btn"        data-tab="dataset"  onclick="goTab('dataset')">  <span class="tab-icon">📋</span><span class="tab-label">Dataset</span></button>
+    <button class="tab-btn tab-btn-new" onclick="startNewBrew()" style="background:var(--accent);border-radius:50%;width:46px;height:46px;flex:none;margin:-10px 2px 0;align-self:center;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(200,85,58,0.4)"><span style="font-size:26px;line-height:1;color:#fff;font-weight:300">+</span></button>
     <button class="tab-btn"        data-tab="guide"    onclick="goTab('guide')">    <span class="tab-icon">👅</span><span class="tab-label">Tasting</span></button>
     <button class="tab-btn"        data-tab="settings" onclick="goTab('settings')"> <span class="tab-icon">⚙️</span><span class="tab-label">Settings</span></button>
     <button class="tab-btn"        data-tab="stats"    onclick="goTab('stats')">    <span class="tab-icon">📊</span><span class="tab-label">Stats</span></button>
@@ -1878,6 +1877,13 @@ function resetLogForm() {
   TAB_CFG.log.title = 'New Brew';
   document.getElementById('hTitle').textContent = 'New Brew';
   clearDraft();
+}
+
+function startNewBrew() {
+  editBrewId = null;
+  resetLogForm();
+  goTab('log');
+  document.getElementById('content').scrollTo(0, 0);
 }
 
 /* ──────────────────────────────────────────────────────────────
@@ -3282,7 +3288,7 @@ function setDisp(id, val, fallback) {
    Cloud Sync (zero-setup via jsonblob.com)
 ────────────────────────────────────────────────────────────── */
 const K_SYNC = 'bl_sync_id';
-const BLOB_API = 'https://jsonblob.com/api/jsonBlob';
+const NP_API = 'https://jsonblob.com/api/jsonBlob';
 
 function getSyncId() { return localStorage.getItem(K_SYNC) || ''; }
 function setSyncId(id) { localStorage.setItem(K_SYNC, id); }
@@ -3320,22 +3326,25 @@ async function createSyncRoom() {
   syncLog('Creating…');
   try {
     const data = { brews, beans, equipment: settings, ts: Date.now() };
-    const res = await fetch(BLOB_API, {
+    const res = await fetch(NP_API, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
       body: JSON.stringify(data),
     });
     if (!res.ok) throw new Error('HTTP ' + res.status);
 
-    /* jsonblob returns the ID in the Location header */
-    const loc = res.headers.get('Location') || '';
-    const id = loc.split('/').pop();
-    if (!id) throw new Error('No blob ID returned');
+    /* jsonblob returns ID in Location header and X-jsonblob-id */
+    let id = res.headers.get('X-jsonblob-id') || '';
+    if (!id) {
+      const loc = res.headers.get('Location') || '';
+      id = loc.split('/').pop();
+    }
+    if (!id) throw new Error('Could not get sync ID — try again');
 
     setSyncId(id);
     updateSyncUI();
     showToast('☁️ Sync code created!');
-    syncLog('Code: ' + id + ' — enter this on your other device');
+    syncLog('Code created — enter it on your other device');
   } catch(e) {
     showToast('Failed to create sync');
     syncLog('Error: ' + e.message);
@@ -3348,7 +3357,7 @@ async function joinSyncRoom() {
 
   syncLog('Connecting…');
   try {
-    const res = await fetch(BLOB_API + '/' + code, {
+    const res = await fetch(NP_API + '/' + code, {
       headers: { 'Accept': 'application/json' },
     });
     if (!res.ok) {
@@ -3363,7 +3372,7 @@ async function joinSyncRoom() {
     mergeRemoteData(data);
     updateSyncUI();
     showToast('☁️ Connected & synced!');
-    syncLog('Connected. Last sync: ' + new Date().toLocaleTimeString());
+    syncLog('Last sync: ' + new Date().toLocaleTimeString());
   } catch(e) {
     showToast('Connection failed');
     syncLog('Error: ' + e.message);
@@ -3384,7 +3393,7 @@ async function syncPush() {
   syncLog('Pushing…');
   try {
     const data = { brews, beans, equipment: settings, ts: Date.now() };
-    const res = await fetch(BLOB_API + '/' + id, {
+    const res = await fetch(NP_API + '/' + id, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
       body: JSON.stringify(data),
@@ -3404,7 +3413,7 @@ async function syncPull() {
 
   syncLog('Pulling…');
   try {
-    const res = await fetch(BLOB_API + '/' + id, {
+    const res = await fetch(NP_API + '/' + id, {
       headers: { 'Accept': 'application/json' },
     });
     if (!res.ok) throw new Error('HTTP ' + res.status);
