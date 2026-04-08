@@ -3332,12 +3332,16 @@ function exportXLSX() {
 
   /* ── 1. BREW LOG ── */
   const sortedBrews = [...brews].sort((a,b) => (b.date||'').localeCompare(a.date||''));
+  /* Count brew # per bean (by beanId) */
+  const _beanBrewCount = {};
   const brewRows = sortedBrews.map((b, i) => {
     const bean = beans.find(bn => bn.id === b.beanId);
+    const beanKey = b.beanId || 'unknown';
+    _beanBrewCount[beanKey] = (_beanBrewCount[beanKey] || 0) + 1;
     const dor = getDOR(bean, b);
     const ratio = (b.dose && b.water) ? +(b.water / b.dose).toFixed(1) : '';
     return {
-      '#': i + 1,
+      '#': _beanBrewCount[beanKey],
       'Date': b.date || '',
       'Session': b.name || '',
       'Score': num(b.score),
