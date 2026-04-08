@@ -951,7 +951,7 @@ body {
           </div>
           <div class="row">
             <span class="row-label">Grind</span>
-            <input class="row-input" id="lGrind" type="text" placeholder="e.g. 30 clicks">
+            <input class="row-input" id="lGrind" type="text" placeholder="">
           </div>
           <div class="row">
             <span class="row-label">Bloom</span>
@@ -1256,11 +1256,11 @@ body {
     <div class="sheet-scroll" style="padding-bottom:env(safe-area-inset-bottom)">
       <div class="group" style="margin:16px;border-radius:12px;overflow:hidden">
         <div class="row"><span class="row-label">Roaster</span><input class="row-input" id="bRoaster" type="text" placeholder="Required"></div>
-        <div class="row"><span class="row-label">Farm</span><input class="row-input" id="bFarmName" type="text" placeholder="e.g. Adrian Lasso"></div>
-        <div class="row"><span class="row-label">Region</span><input class="row-input" id="bFarm" type="text" placeholder="e.g. Ethiopia"></div>
-        <div class="row"><span class="row-label">Processing</span><input class="row-input" id="bProc" type="text" placeholder="e.g. Washed"></div>
-        <div class="row"><span class="row-label">Varietal</span><input class="row-input" id="bVarietal" type="text" placeholder="e.g. Gesha"></div>
-        <div class="row"><span class="row-label">Other</span><input class="row-input" id="bOther" type="text" placeholder="Altitude, notes…"></div>
+        <div class="row"><span class="row-label">Farm</span><input class="row-input" id="bFarmName" type="text"></div>
+        <div class="row"><span class="row-label">Region</span><input class="row-input" id="bFarm" type="text"></div>
+        <div class="row"><span class="row-label">Processing</span><input class="row-input" id="bProc" type="text"></div>
+        <div class="row"><span class="row-label">Varietal</span><input class="row-input" id="bVarietal" type="text"></div>
+        <div class="row"><span class="row-label">Other</span><input class="row-input" id="bOther" type="text"></div>
         <div class="row"><span class="row-label">Roast date</span><input class="row-input" id="bRoastDate" type="date" style="text-align:right"></div>
         <div class="row" style="border-bottom:none"><span class="row-label">Frozen at day</span><input class="row-input" id="bFrozenDay" type="number" placeholder="e.g. 14" inputmode="numeric" min="0"></div>
       </div>
@@ -1713,7 +1713,7 @@ function pickBean(id) {
 }
 
 function bdn(b) {
-  return [b.roaster, b.farmName, b.processing, b.varietal].filter(Boolean).join(' · ');
+  return [b.roaster, b.farmName, b.farm, b.processing, b.varietal, b.other].filter(Boolean).join(' · ');
 }
 
 function beanAge(b, refDate) {
