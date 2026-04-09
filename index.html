@@ -80,7 +80,7 @@ body {
 }
 
 /* ── App shell ────────────────────────────────────────────────── */
-#app {
+#appRoot {
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -932,7 +932,7 @@ body {
 </style>
 </head>
 <body>
-<div id="app">
+<div id="appRoot">
 
   <!-- Header -->
   <div class="header">
@@ -1261,6 +1261,10 @@ body {
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M1 12l4-5 3 3 4-4 3 3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
         Export Charts (Coach Report)
       </button>
+      <button class="export-btn" style="margin-top:8px" onclick="shareCoachReport()">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="12" cy="3" r="2" stroke="currentColor" stroke-width="1.5"/><circle cx="4" cy="8" r="2" stroke="currentColor" stroke-width="1.5"/><circle cx="12" cy="13" r="2" stroke="currentColor" stroke-width="1.5"/><line x1="5.8" y1="7" x2="10.2" y2="4" stroke="currentColor" stroke-width="1.5"/><line x1="5.8" y1="9" x2="10.2" y2="12" stroke="currentColor" stroke-width="1.5"/></svg>
+        Share Coach Report (Link)
+      </button>
     </div>
 
     <!-- ══ STATS ═════════════════════════════════════════════════ -->
@@ -1567,6 +1571,9 @@ function updateDataStatus() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  /* If URL has ?report= param, render shared report and skip normal app init */
+  if (_checkSharedReport()) return;
+
   checkStorage();
   setLogDate(logDate);
   buildSegControls();
@@ -4070,6 +4077,188 @@ function exportChartReport() {
   a.click();
   URL.revokeObjectURL(url);
   showToast('Chart report exported!');
+}
+
+/* ──────────────────────────────────────────────────────────────
+   Shareable Coach Report (link)
+────────────────────────────────────────────────────────────── */
+function _buildReportData() {
+  const sorted = [...brews].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  if (!sorted.length) return null;
+  const beanMap = {};
+  beans.forEach(b => beanMap[b.id] = b);
+  const bLabel = id => { const b = beanMap[id]; return b ? [b.roaster, b.farmName, b.processing, b.varietal].filter(Boolean).join(' \u00b7 ') : 'Unknown'; };
+  const intMap = { 'Low': 1, 'Med-Low': 2, 'Med': 3, 'Med-High': 4, 'High': 5 };
+  const intVal = s => intMap[s] || 0;
+  const beanOptions = [];
+  const seen = {};
+  const exportBrews = sorted.map(b => {
+    const bean = beanMap[b.beanId];
+    const dor = (bean && bean.roastDate && b.date) ? Math.max(0, Math.floor((new Date(b.date+'T12:00:00') - new Date(bean.roastDate+'T12:00:00')) / 86400000)) : null;
+    if (!seen[b.beanId]) { seen[b.beanId] = true; beanOptions.push({ id: b.beanId, label: bLabel(b.beanId) }); }
+    return {
+      bi: b.beanId, bl: bLabel(b.beanId), d: b.date||'', sc: b.score??null,
+      ey: b.ey??null, tds: b.tds??null, gr: parseFloat(b.grind)||null,
+      gn: b.grinder||'', do: b.dose||null, w: b.water||null, bv: b.beverageWeight||null,
+      tp: b.temp||null, bm: b.bloom||null, dr: dor,
+      ha: parseInt(b.hot?.acidity)||0, hs: parseInt(b.hot?.sweetness)||0, hb: parseInt(b.hot?.bitterness)||0,
+      ca: parseInt(b.cool?.acidity)||0, cs: parseInt(b.cool?.sweetness)||0, cb: parseInt(b.cool?.bitterness)||0,
+      hi: intVal(b.hot?.intensity), ci: intVal(b.cool?.intensity),
+    };
+  });
+  return { b: exportBrews, o: beanOptions };
+}
+
+function shareCoachReport() {
+  const data = _buildReportData();
+  if (!data) { showToast('No brews to share'); return; }
+  try {
+    const json = JSON.stringify(data);
+    const encoded = btoa(unescape(encodeURIComponent(json)));
+    const base = location.href.split('#')[0].split('?')[0];
+    const link = base + '?report=' + encoded;
+    if (link.length > 50000) { showToast('Too much data \u2014 use Export instead'); return; }
+    navigator.clipboard.writeText(link).then(() => {
+      showToast('Link copied to clipboard!');
+    }).catch(() => {
+      /* fallback: prompt */
+      prompt('Copy this link:', link);
+    });
+  } catch(e) { showToast('Failed: ' + e.message); }
+}
+
+/* Render shared report if URL has ?report= param */
+function _checkSharedReport() {
+  const params = new URLSearchParams(location.search);
+  const reportData = params.get('report');
+  if (!reportData) return false;
+  try {
+    const json = decodeURIComponent(escape(atob(reportData)));
+    const data = JSON.parse(json);
+    _renderSharedReport(data);
+    return true;
+  } catch(e) { console.error('Bad report link', e); return false; }
+}
+
+function _renderSharedReport(data) {
+  const allBrews = data.b;
+  const beanOpts = data.o;
+  /* hide the app, show report */
+  document.getElementById('appRoot').style.display = 'none';
+  const div = document.createElement('div');
+  div.id = 'sharedReport';
+  div.innerHTML = '<div style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;background:#f5f0eb;min-height:100vh;padding:24px;max-width:1100px;margin:0 auto">'
+    + '<h1 style="font-size:22px;color:#1B2A4A;margin:0 0 4px">Brew Coach Report</h1>'
+    + '<div class="rpt-sub" style="font-size:13px;color:#888;margin-bottom:20px">' + allBrews.length + ' brews</div>'
+    + '<div style="background:#fff;border-radius:12px;padding:16px 20px;margin-bottom:20px;box-shadow:0 1px 4px rgba(0,0,0,.06);display:flex;align-items:center;gap:12px;flex-wrap:wrap">'
+    + '<label style="font-size:13px;font-weight:600;color:#1B2A4A;text-transform:uppercase;letter-spacing:.5px">Bean</label>'
+    + '<select id="rptBean" style="font-size:15px;padding:8px 12px;border-radius:8px;border:1.5px solid #D5D0CA;background:#FAFAF8;color:#2c2c2c;min-width:200px;cursor:pointer"><option value="">All Beans</option></select></div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px" id="rptGrid">'
+    + '<div style="background:#fff;border-radius:12px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,.06)"><h2 style="font-size:15px;color:#1B2A4A;margin:0 0 12px;text-transform:uppercase;letter-spacing:.5px">EY vs TDS</h2><div id="rptEY"></div></div>'
+    + '<div style="background:#fff;border-radius:12px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,.06)"><h2 style="font-size:15px;color:#1B2A4A;margin:0 0 12px;text-transform:uppercase;letter-spacing:.5px">Variable vs Score</h2>'
+    + '<select id="rptVar" style="font-size:14px;padding:6px 10px;border-radius:8px;border:1.5px solid #D5D0CA;background:#FAFAF8;color:#2c2c2c;cursor:pointer;margin-bottom:12px">'
+    + '<option value="gr">Grind Size</option><option value="dr">Days Off Roast</option><option value="do">Dose (g)</option><option value="w">Water In (ml)</option><option value="bv">Yield (g)</option><option value="tp">Temp</option><option value="bm">Bloom (s)</option><option value="tds">TDS %</option><option value="ey">EY %</option></select>'
+    + '<div id="rptVar2"></div></div>'
+    + '<div style="background:#fff;border-radius:12px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,.06)"><h2 style="font-size:15px;color:#1B2A4A;margin:0 0 12px;text-transform:uppercase;letter-spacing:.5px">Days Off Roast vs Score</h2><div id="rptDor"></div></div>'
+    + '</div>'
+    + '<div style="background:#fff;border-radius:12px;padding:20px;margin-top:20px;box-shadow:0 1px 4px rgba(0,0,0,.06)">'
+    + '<h2 style="font-size:15px;color:#1B2A4A;margin:0 0 12px;text-transform:uppercase;letter-spacing:.5px">Sensory Profile (Flavour Quality)</h2>'
+    + '<div id="rptRadarToggles" style="display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 8px"></div>'
+    + '<div id="rptRadar"></div></div>'
+    + '<div style="text-align:center;padding:30px 0 10px;font-size:12px;color:#bbb">Generated with Coffee Log</div>'
+    + '</div>';
+  document.body.appendChild(div);
+  /* Responsive grid */
+  const style = document.createElement('style');
+  style.textContent = '@media(max-width:700px){#rptGrid{grid-template-columns:1fr!important}}';
+  document.head.appendChild(style);
+
+  /* Load Chart.js then render */
+  const sc = document.createElement('script');
+  sc.src = 'https://cdn.jsdelivr.net/npm/chart.js@4';
+  sc.onload = function() { _initReportCharts(allBrews, beanOpts); };
+  document.head.appendChild(sc);
+}
+
+function _initReportCharts(allBrews, beanOpts) {
+  const colors = ['#4A7C59','#C1666B','#4B88A2','#D4A574','#7B68A6','#48A9A6','#E07A5F','#8B5E3C','#6A9FB5','#D4869C'];
+  const charts = {};
+  let radarVisible = {};
+  const sel = document.getElementById('rptBean');
+  beanOpts.forEach(function(o) { const op = document.createElement('option'); op.value = o.id; op.textContent = o.label; sel.appendChild(op); });
+
+  function filtered() { const id = sel.value; return id ? allBrews.filter(function(b){return b.bi===id}) : allBrews; }
+  function destroyAll() { Object.keys(charts).forEach(function(k){charts[k].destroy();delete charts[k]}); }
+
+  const varLabels = {gr:'Grind Size',dr:'Days Off Roast',do:'Dose (g)',w:'Water In (ml)',bv:'Yield (g)',tp:'Temp (\u00b0C)',bm:'Bloom (s)',tds:'TDS %',ey:'EY %'};
+
+  function rebuild() {
+    destroyAll(); radarVisible = {};
+    const fb = filtered();
+    document.querySelector('.rpt-sub').textContent = fb.length + ' brews';
+
+    /* EY vs TDS */
+    const ey = []; fb.forEach(function(b){if(b.ey!=null&&b.tds!=null){const ratio=b.do&&b.w?'1:'+Math.round(b.w/b.do*10)/10:'?';ey.push({x:b.tds,y:b.ey,ratio:ratio,yld:b.bv!=null?b.bv:'?'})}});
+    const eyEl = document.getElementById('rptEY');
+    if(ey.length){eyEl.innerHTML='<canvas id="cRptEY"></canvas>';charts.ey=new Chart(document.getElementById('cRptEY'),{type:'scatter',data:{datasets:[{data:ey,backgroundColor:'#4B88A2',pointRadius:6}]},options:{scales:{x:{title:{display:true,text:'TDS %'}},y:{title:{display:true,text:'EY %'}}},plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){const p=ctx.raw;return 'TDS: '+p.x+'% | EY: '+p.y+'% | '+p.ratio+' (yield: '+p.yld+'g)'}}}}}});}
+    else{eyEl.innerHTML='<div style="text-align:center;color:#999;padding:40px 0;font-size:14px">No EY/TDS data</div>';}
+
+    /* DOR vs Score */
+    const dor = []; fb.forEach(function(b){if(b.sc!=null&&b.dr!=null)dor.push({x:b.dr,y:b.sc})});
+    const dorEl = document.getElementById('rptDor');
+    if(dor.length){dorEl.innerHTML='<canvas id="cRptDor"></canvas>';charts.dor=new Chart(document.getElementById('cRptDor'),{type:'scatter',data:{datasets:[{data:dor,backgroundColor:'#D4A574',pointRadius:6}]},options:{scales:{x:{title:{display:true,text:'Days Off Roast'}},y:{title:{display:true,text:'Score'},min:0,max:10}},plugins:{legend:{display:false}}}});}
+    else{dorEl.innerHTML='<div style="text-align:center;color:#999;padding:40px 0;font-size:14px">No DOR/score data</div>';}
+
+    rebuildVar();
+    rebuildRadar(fb);
+  }
+
+  function rebuildVar() {
+    const key = document.getElementById('rptVar').value;
+    const fb = filtered();
+    if(charts.vr){charts.vr.destroy();delete charts.vr;}
+    const byG = {}; fb.forEach(function(b){if(b.sc!=null&&b[key]!=null){const g=b.gn||'Unknown';if(!byG[g])byG[g]=[];byG[g].push({x:b[key],y:b.sc})}});
+    const ds = []; let gi=0; Object.keys(byG).forEach(function(g){ds.push({label:g,data:byG[g],backgroundColor:colors[gi%colors.length],pointRadius:6});gi++;});
+    const el = document.getElementById('rptVar2');
+    if(ds.length){el.innerHTML='<canvas id="cRptVar"></canvas>';charts.vr=new Chart(document.getElementById('cRptVar'),{type:'scatter',data:{datasets:ds},options:{scales:{x:{title:{display:true,text:varLabels[key]||key}},y:{title:{display:true,text:'Score'},min:0,max:10}}}});}
+    else{el.innerHTML='<div style="text-align:center;color:#999;padding:40px 0;font-size:14px">No data</div>';}
+  }
+
+  function rebuildRadar(fb) {
+    const tBar = document.getElementById('rptRadarToggles'); tBar.innerHTML = '';
+    const radarLabels = ['Hot Acidity','Hot Sweet','Cool Sweet','Cool Bitter','Hot Bitter','Cool Acidity'];
+    const lblColors = radarLabels.map(function(l){return l.indexOf('Bitter')>=0?'#8B0000':'#555'});
+    fb.forEach(function(b, i) {
+      const btn = document.createElement('button');
+      btn.style.cssText = 'padding:6px 14px;border-radius:20px;border:1.5px solid #D5D0CA;background:#FAFAF8;font-size:13px;cursor:pointer;color:#555;font-family:inherit';
+      const dd = b.d ? b.d.split('-') : []; const fmtD = dd.length===3 ? (dd[2]+'-'+dd[1]+'-'+dd[0]) : b.d;
+      btn.textContent = (b.sc!=null ? 'Score: '+b.sc+'/10' : 'No score') + (fmtD ? ' '+fmtD : '');
+      btn.onclick = function() { toggleRad(i, fb, radarLabels, lblColors); };
+      tBar.appendChild(btn);
+    });
+    const el = document.getElementById('rptRadar');
+    el.innerHTML = '<canvas id="cRptRad"></canvas>';
+    charts.rad = new Chart(document.getElementById('cRptRad'), {type:'radar',data:{labels:radarLabels,datasets:[]},options:{scales:{r:{min:0,max:9,ticks:{stepSize:1},pointLabels:{color:lblColors,font:{weight:function(ctx){return radarLabels[ctx.index].indexOf('Bitter')>=0?'700':'400'}}}}}}});
+  }
+
+  function toggleRad(idx, fb, radarLabels, lblColors) {
+    if(radarVisible[idx]) delete radarVisible[idx]; else radarVisible[idx]=true;
+    const btns = document.getElementById('rptRadarToggles').children;
+    for(let j=0;j<btns.length;j++){btns[j].style.background=radarVisible[j]?'#1B2A4A':'#FAFAF8';btns[j].style.color=radarVisible[j]?'#fff':'#555';btns[j].style.borderColor=radarVisible[j]?'#1B2A4A':'#D5D0CA';}
+    const ds=[]; let ci=0;
+    Object.keys(radarVisible).forEach(function(k){
+      const i=parseInt(k); const b=fb[i]; if(!b) return;
+      const dd=b.d?b.d.split('-'):[]; const fmtD=dd.length===3?(dd[2]+'-'+dd[1]+'-'+dd[0]):b.d;
+      const lbl=(b.sc!=null?'Score: '+b.sc+'/10':'No score')+(fmtD?' '+fmtD:'');
+      const c=colors[ci%colors.length]; ci++;
+      ds.push({label:lbl,data:[b.ha,b.hs,b.cs,b.cb,b.hb,b.ca],borderColor:c,backgroundColor:c+'33',pointRadius:3});
+    });
+    charts.rad.data.datasets=ds; charts.rad.update();
+  }
+
+  sel.addEventListener('change', function(){ radarVisible={}; rebuild(); });
+  document.getElementById('rptVar').addEventListener('change', rebuildVar);
+  rebuild();
 }
 
 /* ──────────────────────────────────────────────────────────────
