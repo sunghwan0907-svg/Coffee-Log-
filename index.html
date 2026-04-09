@@ -3459,7 +3459,7 @@ function exportXLSX() {
       'Adjustments': b.adjust || '',
     };
   });
-  XLSX.utils.book_append_sheet(wb, styledSheet(brewRows, brewColGroups), 'Brew Log');
+  XLSX.utils.book_append_sheet(wb, styledSheet(brewRows, brewColGroups), 'Raw Data');
 
   /* ── 2. BY BEAN ── */
   const byBeanColGroups = {
@@ -3605,59 +3605,6 @@ function exportXLSX() {
     XLSX.utils.book_append_sheet(wb, wsCoach, 'Coach View');
   }
 
-  /* ── 4. SUMMARY ── */
-  const titleStyle = { font: { bold: true, sz: 14, color: white, name: 'Calibri' }, fill: { fgColor: navy }, alignment: { vertical: 'center' }, border: baseBorder };
-  const sectionStyle = { font: { bold: true, sz: 11, color: { rgb: '1B2A4A' }, name: 'Calibri' }, fill: { fgColor: sand }, border: baseBorder };
-  const metricLabel = { font: { sz: 10.5, color: { rgb: '5A5A5A' }, name: 'Calibri' }, fill: { fgColor: cream }, border: baseBorder, alignment: { vertical: 'center' } };
-  const metricVal = { font: { bold: true, sz: 11, color: { rgb: '1B2A4A' }, name: 'Calibri' }, fill: { fgColor: cream }, border: baseBorder, alignment: { horizontal: 'right', vertical: 'center' } };
-  const blankStyle = { fill: { fgColor: white }, border: baseBorder };
-
-  const scores = brews.filter(b => b.score != null).map(b => b.score);
-  const eys = brews.filter(b => b.ey != null).map(b => b.ey);
-  const topBean = (() => {
-    let best = null, bestAvg = 0;
-    beans.forEach(bn => {
-      const s = brews.filter(b => b.beanId === bn.id && b.score != null);
-      if (s.length >= 1) { const avg = s.reduce((a,c) => a+c.score,0)/s.length; if (avg > bestAvg) { bestAvg = avg; best = bn; } }
-    });
-    return best ? bdn(best) + ' (' + bestAvg.toFixed(1) + ')' : '—';
-  })();
-
-  const sumData = [
-    ['', ''],
-    ['BREW LOG SUMMARY', ''],
-    ['', ''],
-    ['Total Brews', brews.length],
-    ['Total Beans', beans.length],
-    ['', ''],
-    ['SCORING', ''],
-    ['Average Score', scores.length ? +(scores.reduce((a,b)=>a+b,0)/scores.length).toFixed(1) : '—'],
-    ['Best Score', scores.length ? Math.max(...scores) : '—'],
-    ['Top Bean', topBean],
-    ['', ''],
-    ['EXTRACTION', ''],
-    ['Average EY', eys.length ? +(eys.reduce((a,b)=>a+b,0)/eys.length).toFixed(1) + '%' : '—'],
-    ['Best EY', eys.length ? +(Math.max(...eys)).toFixed(1) + '%' : '—'],
-    ['', ''],
-    ['DETAILS', ''],
-    ['Date Range', brews.length ? brews[brews.length-1].date + '  to  ' + brews[0].date : '—'],
-    ['Exported', today()],
-  ];
-
-  const ws4 = XLSX.utils.aoa_to_sheet(sumData);
-  ws4['!cols'] = [{ wch: 22 }, { wch: 35 }];
-  sumData.forEach((row, r) => {
-    const a0 = XLSX.utils.encode_cell({r,c:0});
-    const a1 = XLSX.utils.encode_cell({r,c:1});
-    if (!ws4[a0]) ws4[a0] = { v: '', t: 's' };
-    if (!ws4[a1]) ws4[a1] = { v: '', t: 's' };
-    if (row[0] === 'BREW LOG SUMMARY') { ws4[a0].s = titleStyle; ws4[a1].s = titleStyle; }
-    else if (['SCORING','EXTRACTION','DETAILS'].includes(row[0])) { ws4[a0].s = sectionStyle; ws4[a1].s = sectionStyle; }
-    else if (row[0] === '') { ws4[a0].s = blankStyle; ws4[a1].s = blankStyle; }
-    else { ws4[a0].s = metricLabel; ws4[a1].s = metricVal; }
-  });
-  ws4['!rows'] = sumData.map((r) => r[0]==='BREW LOG SUMMARY' ? {hpt:32} : {hpt:24});
-  XLSX.utils.book_append_sheet(wb, ws4, 'Summary');
 
   XLSX.writeFile(wb, 'Brew-Log-' + today() + '.xlsx');
   showToast('Exported!');
