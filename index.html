@@ -4109,31 +4109,73 @@ function _buildReportData() {
   return { b: exportBrews, o: beanOptions };
 }
 
-function shareCoachReport() {
+/* Compress/decompress helpers using DeflateRaw */
+async function _compress(str) {
+  const buf = new TextEncoder().encode(str);
+  const cs = new CompressionStream('deflate-raw');
+  const writer = cs.writable.getWriter();
+  writer.write(buf); writer.close();
+  const chunks = []; const reader = cs.readable.getReader();
+  while (true) { const { done, value } = await reader.read(); if (done) break; chunks.push(value); }
+  const out = new Uint8Array(chunks.reduce((a, c) => a + c.length, 0));
+  let off = 0; chunks.forEach(c => { out.set(c, off); off += c.length; });
+  /* base64url encode */
+  let b64 = btoa(String.fromCharCode(...out));
+  return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+async function _decompress(b64url) {
+  let b64 = b64url.replace(/-/g, '+').replace(/_/g, '/');
+  while (b64.length % 4) b64 += '=';
+  const bin = atob(b64);
+  const buf = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+  const ds = new DecompressionStream('deflate-raw');
+  const writer = ds.writable.getWriter();
+  writer.write(buf); writer.close();
+  const chunks = []; const reader = ds.readable.getReader();
+  while (true) { const { done, value } = await reader.read(); if (done) break; chunks.push(value); }
+  const out = new Uint8Array(chunks.reduce((a, c) => a + c.length, 0));
+  let off = 0; chunks.forEach(c => { out.set(c, off); off += c.length; });
+  return new TextDecoder().decode(out);
+}
+
+async function shareCoachReport() {
   const data = _buildReportData();
   if (!data) { showToast('No brews to share'); return; }
   try {
+    showToast('Generating link...');
     const json = JSON.stringify(data);
-    const encoded = btoa(unescape(encodeURIComponent(json)));
+    const encoded = await _compress(json);
     const base = location.href.split('#')[0].split('?')[0];
-    const link = base + '?report=' + encoded;
-    if (link.length > 50000) { showToast('Too much data \u2014 use Export instead'); return; }
+    const link = base + '?r=' + encoded;
+    if (link.length > 100000) { showToast('Too much data \u2014 use Export instead'); return; }
     navigator.clipboard.writeText(link).then(() => {
-      showToast('Link copied to clipboard!');
+      showToast('Link copied! (' + Math.round(link.length/1024) + 'KB)');
     }).catch(() => {
-      /* fallback: prompt */
       prompt('Copy this link:', link);
     });
   } catch(e) { showToast('Failed: ' + e.message); }
 }
 
-/* Render shared report if URL has ?report= param */
+/* Render shared report if URL has ?r= or ?report= param */
 function _checkSharedReport() {
   const params = new URLSearchParams(location.search);
-  const reportData = params.get('report');
-  if (!reportData) return false;
+  const compressed = params.get('r');
+  const legacy = params.get('report');
+  if (!compressed && !legacy) return false;
+  if (compressed) {
+    /* async decompress */
+    _decompress(compressed).then(json => {
+      const data = JSON.parse(json);
+      _renderSharedReport(data);
+    }).catch(e => { console.error('Bad report link', e); });
+    /* hide app immediately while loading */
+    document.getElementById('appRoot').style.display = 'none';
+    return true;
+  }
+  /* legacy uncompressed */
   try {
-    const json = decodeURIComponent(escape(atob(reportData)));
+    const json = decodeURIComponent(escape(atob(legacy)));
     const data = JSON.parse(json);
     _renderSharedReport(data);
     return true;
