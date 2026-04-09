@@ -1888,11 +1888,12 @@ function pickEquip(val) {
 function openWaterPicker() {
   const el = document.getElementById('waterList');
   const options = [...WATER_PRESETS, 'Custom'];
-  el.innerHTML = options.map(item => `
-    <div class="pick-row${item===selWater?' selected':''}" onclick="${item==='Custom'?'showCustomWater()':'pickWater(\\\''+esc(item)+'\\\')'}">
-      <div class="pick-main">${esc(item)}</div>
-      <span class="pick-check">✓</span>
-    </div>`).join('');
+  el.innerHTML = options.map(item => {
+    const action = item === 'Custom' ? 'showCustomWater()' : "pickWater(&quot;" + esc(item) + "&quot;)";
+    return '<div class="pick-row' + (item===selWater?' selected':'') + '" onclick="' + action + '">'
+      + '<div class="pick-main">' + esc(item) + '</div>'
+      + '<span class="pick-check">\u2713</span></div>';
+  }).join('');
   document.getElementById('waterCustomWrap').style.display = 'none';
   openSheet('sWater');
 }
