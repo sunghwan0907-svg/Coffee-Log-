@@ -3705,6 +3705,8 @@ function exportChartReport() {
       dose: b.dose || null,
       water: b.water || null,
       bev: b.beverageWeight || null,
+      temp: b.temp || null,
+      bloom: b.bloom || null,
       dor: dor,
       aromaInt: intVal(b.aroma?.intensity),
       hotAcid: parseInt(b.hot?.acidity) || 0,
@@ -3752,7 +3754,7 @@ function exportChartReport() {
   + '\n<div class="filter-bar"><label>Bean</label><select id="beanPick" onchange="rebuild()"><option value="">All Beans</option></select></div>'
   + '\n<div class="grid">'
   + '<div class="card"><h2>EY vs TDS</h2><div id="eyWrap"><canvas id="cEY"></canvas></div></div>'
-  + '<div class="card"><h2>Grind Size vs Score</h2><div id="grWrap"><canvas id="cGr"></canvas></div></div>'
+  + '<div class="card"><h2>Variable vs Score</h2><div style="margin-bottom:12px"><select id="varPick" onchange="rebuildVar()" style="font-size:14px;padding:6px 10px;border-radius:8px;border:1.5px solid #D5D0CA;background:#FAFAF8;color:#2c2c2c;cursor:pointer"><option value="grind">Grind Size</option><option value="dor">Days Off Roast</option><option value="dose">Dose (g)</option><option value="water">Water In (ml)</option><option value="bev">Yield / Bev Weight (g)</option><option value="temp">Temp (\u00b0C)</option><option value="bloom">Bloom (s)</option><option value="tds">TDS %</option><option value="ey">EY %</option></select></div><div id="varWrap"><canvas id="cVar"></canvas></div></div>'
   + '<div class="card"><h2>Days Off Roast vs Score</h2><div id="dorWrap"><canvas id="cDor"></canvas></div></div>'
   + '</div>'
   + '\n<div class="card"><h2>Sensory Profile (Flavour Quality)</h2><div id="radarToggles" class="toggle-bar"></div><div id="radarWrap"><canvas id="cRad"></canvas></div></div>'
@@ -3774,11 +3776,8 @@ function exportChartReport() {
   + '  var ey=[];fb.forEach(function(b){if(b.ey!=null&&b.tds!=null){var ratio=b.dose&&b.water?"1:"+Math.round(b.water/b.dose*10)/10:"?";var yld=b.bev!=null?b.bev:"?";ey.push({x:b.tds,y:b.ey,ratio:ratio,yld:yld})}});\n'
   + '  if(ey.length){document.getElementById("eyWrap").innerHTML=\'<canvas id="cEY"></canvas>\';charts.ey=new Chart(document.getElementById("cEY"),{type:"scatter",data:{datasets:[{data:ey,backgroundColor:"#4B88A2",pointRadius:6}]},options:{scales:{x:{title:{display:true,text:"TDS %"}},y:{title:{display:true,text:"EY %"}}},plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){var p=ctx.raw;return "TDS: "+p.x+"% | EY: "+p.y+"% | "+p.ratio+" (yield: "+p.yld+"g)"}}}}}})}\n'
   + '  else{document.getElementById("eyWrap").innerHTML=\'<div class="empty-msg">No EY/TDS data</div>\'}\n'
-  /* Grind vs Score — per grinder datasets */
-  + '  var grByGrinder={};fb.forEach(function(b){if(b.score!=null&&b.grind!=null){var g=b.grinder||"Unknown";if(!grByGrinder[g])grByGrinder[g]=[];grByGrinder[g].push({x:b.grind,y:b.score})}});\n'
-  + '  var grDS=[];var gi=0;Object.keys(grByGrinder).forEach(function(g){grDS.push({label:g,data:grByGrinder[g],backgroundColor:colors[gi%colors.length],pointRadius:6});gi++});\n'
-  + '  if(grDS.length){document.getElementById("grWrap").innerHTML=\'<canvas id="cGr"></canvas>\';charts.gr=new Chart(document.getElementById("cGr"),{type:"scatter",data:{datasets:grDS},options:{scales:{x:{title:{display:true,text:"Grind Size"}},y:{title:{display:true,text:"Score"},min:0,max:10}}}})}\n'
-  + '  else{document.getElementById("grWrap").innerHTML=\'<div class="empty-msg">No grind/score data</div>\'}\n'
+  /* Variable vs Score — dynamic */
+  + '  rebuildVar();\n'
   /* DOR vs Score */
   + '  var dor=[];fb.forEach(function(b){if(b.score!=null&&b.dor!=null)dor.push({x:b.dor,y:b.score})});\n'
   + '  if(dor.length){document.getElementById("dorWrap").innerHTML=\'<canvas id="cDor"></canvas>\';charts.dor=new Chart(document.getElementById("cDor"),{type:"scatter",data:{datasets:[{data:dor,backgroundColor:"#D4A574",pointRadius:6}]},options:{scales:{x:{title:{display:true,text:"Days Off Roast"}},y:{title:{display:true,text:"Score"},min:0,max:10}},plugins:{legend:{display:false}}}})}\n'
@@ -3796,6 +3795,17 @@ function exportChartReport() {
   + '  document.getElementById("radarWrap").innerHTML=\'<canvas id="cRad"></canvas>\';\n'
   + '  var lblColors=radarLabels.map(function(l){return l.indexOf("Bitter")>=0?"#8B0000":"#555"});\n'
   + '  charts.rad=new Chart(document.getElementById("cRad"),{type:"radar",data:{labels:radarLabels,datasets:[]},options:{scales:{r:{min:0,max:9,ticks:{stepSize:1},pointLabels:{color:lblColors,font:{weight:function(ctx){return radarLabels[ctx.index].indexOf("Bitter")>=0?"700":"400"}}}}}}});\n'
+  + '}\n'
+  /* rebuildVar — dynamic variable vs score chart */
+  + 'var varLabels={grind:"Grind Size",dor:"Days Off Roast",dose:"Dose (g)",water:"Water In (ml)",bev:"Yield / Bev Weight (g)",temp:"Temp (\\u00b0C)",bloom:"Bloom (s)",tds:"TDS %",ey:"EY %"};\n'
+  + 'function rebuildVar(){\n'
+  + '  var key=document.getElementById("varPick").value;\n'
+  + '  var fb=filtered();\n'
+  + '  if(charts.vr){charts.vr.destroy();delete charts.vr}\n'
+  + '  var byGrinder={};fb.forEach(function(b){if(b.score!=null&&b[key]!=null){var g=b.grinder||"Unknown";if(!byGrinder[g])byGrinder[g]=[];byGrinder[g].push({x:b[key],y:b.score})}});\n'
+  + '  var ds=[];var gi=0;Object.keys(byGrinder).forEach(function(g){ds.push({label:g,data:byGrinder[g],backgroundColor:colors[gi%colors.length],pointRadius:6});gi++});\n'
+  + '  if(ds.length){document.getElementById("varWrap").innerHTML=\'<canvas id="cVar"></canvas>\';charts.vr=new Chart(document.getElementById("cVar"),{type:"scatter",data:{datasets:ds},options:{scales:{x:{title:{display:true,text:varLabels[key]||key}},y:{title:{display:true,text:"Score"},min:0,max:10}}}})}\n'
+  + '  else{document.getElementById("varWrap").innerHTML=\'<div class="empty-msg">No data for this variable</div>\'}\n'
   + '}\n'
   /* Toggle individual brew on radar */
   + 'function toggleRadar(idx){\n'
