@@ -4360,9 +4360,53 @@ function _strip(obj) {
   return obj;
 }
 
+/* Sync key shortening maps */
+const _SK = {id:'i',beanId:'bi',name:'n',date:'d',grinder:'gr',brewer:'br',filter:'fi',waterType:'wt',dose:'do',water:'wa',temp:'tp',grind:'gd',bloom:'bm',totalTime:'tt',beverageWeight:'bw',tds:'td',ey:'ey',recipeNotes:'rn',notes:'no',adjust:'aj',score:'sc',daysOffRoast:'dr',frozen:'fz',customVars:'cv',aroma:'ar',hot:'ht',cool:'cl',intensity:'it',acidity:'ac',sweetness:'sw',bitterness:'bt'};
+const _SKR = {}; for(const k in _SK) _SKR[_SK[k]]=k;
+function _shrinkBrew(b) {
+  const o = {};
+  for (const k in b) {
+    const sk = _SK[k] || k;
+    const v = b[k];
+    if (v && typeof v === 'object' && !Array.isArray(v)) {
+      const inner = {};
+      for (const ik in v) { inner[_SK[ik]||ik] = v[ik]; }
+      o[sk] = inner;
+    } else { o[sk] = v; }
+  }
+  return o;
+}
+function _expandBrew(b) {
+  const o = {};
+  for (const k in b) {
+    const lk = _SKR[k] || k;
+    const v = b[k];
+    if (v && typeof v === 'object' && !Array.isArray(v)) {
+      const inner = {};
+      for (const ik in v) { inner[_SKR[ik]||ik] = v[ik]; }
+      o[lk] = inner;
+    } else { o[lk] = v; }
+  }
+  return o;
+}
+function _shrinkBean(b) {
+  const o = {};
+  for (const k in b) { o[_SK[k]||k] = b[k]; }
+  return o;
+}
+function _expandBean(b) {
+  const o = {};
+  for (const k in b) { o[_SKR[k]||k] = b[k]; }
+  return o;
+}
+
 async function copyAllData() {
   try {
-    const data = _strip({ brews, beans, equipment: settings, ts: Date.now(), v: 2 });
+    const data = _strip({
+      b: brews.map(_shrinkBrew),
+      n: beans.map(_shrinkBean),
+      e: settings, ts: Date.now(), v: 3
+    });
     const json = JSON.stringify(data);
     const compressed = await _compress(json);
     const encoded = 'BREWLOG2:' + compressed;
@@ -4374,7 +4418,11 @@ async function copyAllData() {
   } catch(e) {
     /* fallback: select a temporary textarea */
     try {
-      const data = _strip({ brews, beans, equipment: settings, ts: Date.now(), v: 2 });
+      const data = _strip({
+        b: brews.map(_shrinkBrew),
+        n: beans.map(_shrinkBean),
+        e: settings, ts: Date.now(), v: 3
+      });
       const json = JSON.stringify(data);
       const compressed = await _compress(json);
       const encoded = 'BREWLOG2:' + compressed;
@@ -4421,21 +4469,27 @@ async function pasteAllData() {
 
     const data = JSON.parse(json);
 
+    /* v3 uses short keys (b/n/e), v2 uses long keys (brews/beans/equipment) */
+    const isV3 = data.v >= 3;
+    const srcBrews = isV3 ? (data.b || []).map(_expandBrew) : (data.brews || []);
+    const srcBeans = isV3 ? (data.n || []).map(_expandBean) : (data.beans || []);
+    const srcEquip = isV3 ? data.e : data.equipment;
+
     let added = 0;
-    if (data.brews && Array.isArray(data.brews)) {
+    if (srcBrews.length) {
       const localIds = new Set(brews.map(b => b.id));
-      data.brews.forEach(b => { if (!localIds.has(b.id)) { brews.push(b); added++; } });
+      srcBrews.forEach(b => { if (!localIds.has(b.id)) { brews.push(b); added++; } });
       persist(K_BREWS, brews);
     }
-    if (data.beans && Array.isArray(data.beans)) {
+    if (srcBeans.length) {
       const localIds = new Set(beans.map(b => b.id));
-      data.beans.forEach(b => { if (!localIds.has(b.id)) { beans.push(b); added++; } });
+      srcBeans.forEach(b => { if (!localIds.has(b.id)) { beans.push(b); added++; } });
       persist(K_BEANS, beans);
     }
-    if (data.equipment) {
+    if (srcEquip) {
       ['grinders','brewers','filters'].forEach(k => {
-        if (data.equipment[k]) {
-          settings[k] = [...new Set([...(settings[k]||[]), ...data.equipment[k]])];
+        if (srcEquip[k]) {
+          settings[k] = [...new Set([...(settings[k]||[]), ...srcEquip[k]])];
         }
       });
       persist(K_SETTINGS, settings);
