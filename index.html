@@ -4347,9 +4347,20 @@ function syncLog(msg) {
   el.style.display = msg ? 'block' : 'none';
 }
 
+/* Strip null/undefined/empty values from objects to shrink JSON */
+function _strip(obj) {
+  if (Array.isArray(obj)) return obj.map(_strip);
+  if (obj && typeof obj === 'object') {
+    const out = {};
+    for (const k in obj) { const v = obj[k]; if (v != null && v !== '' && !(typeof v === 'object' && !Array.isArray(v) && Object.keys(v).length === 0)) out[k] = _strip(v); }
+    return out;
+  }
+  return obj;
+}
+
 async function copyAllData() {
   try {
-    const data = { brews, beans, equipment: settings, ts: Date.now(), v: 1 };
+    const data = _strip({ brews, beans, equipment: settings, ts: Date.now(), v: 2 });
     const json = JSON.stringify(data);
     const compressed = await _compress(json);
     const encoded = 'BREWLOG2:' + compressed;
@@ -4361,7 +4372,7 @@ async function copyAllData() {
   } catch(e) {
     /* fallback: select a temporary textarea */
     try {
-      const data = { brews, beans, equipment: settings, ts: Date.now(), v: 1 };
+      const data = _strip({ brews, beans, equipment: settings, ts: Date.now(), v: 2 });
       const json = JSON.stringify(data);
       const compressed = await _compress(json);
       const encoded = 'BREWLOG2:' + compressed;
