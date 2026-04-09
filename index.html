@@ -3691,6 +3691,10 @@ function exportChartReport() {
       ey: b.ey ?? null,
       tds: b.tds ?? null,
       grind: parseFloat(b.grind) || null,
+      grinder: b.grinder || '',
+      dose: b.dose || null,
+      water: b.water || null,
+      bev: b.beverageWeight || null,
       dor: dor,
       aromaInt: intVal(b.aroma?.intensity),
       hotAcid: parseInt(b.hot?.acidity) || 0,
@@ -3756,13 +3760,14 @@ function exportChartReport() {
   + '  destroyAll();radarVisible={};\n'
   + '  var fb=filtered();\n'
   + '  var sub=document.querySelector(".sub");sub.textContent="' + new Date().toLocaleDateString('en-AU',{weekday:'long',year:'numeric',month:'long',day:'numeric'}) + ' \\u00b7 "+fb.length+" brews";\n'
-  /* EY vs TDS */
-  + '  var ey=[];fb.forEach(function(b){if(b.ey!=null&&b.tds!=null)ey.push({x:b.tds,y:b.ey})});\n'
-  + '  if(ey.length){document.getElementById("eyWrap").innerHTML=\'<canvas id="cEY"></canvas>\';charts.ey=new Chart(document.getElementById("cEY"),{type:"scatter",data:{datasets:[{data:ey,backgroundColor:"#4B88A2",pointRadius:6}]},options:{scales:{x:{title:{display:true,text:"TDS %"}},y:{title:{display:true,text:"EY %"}}},plugins:{legend:{display:false}}}})}\n'
+  /* EY vs TDS — tooltip shows brew ratio (dose:water) and yield (bev weight) */
+  + '  var ey=[];fb.forEach(function(b){if(b.ey!=null&&b.tds!=null){var ratio=b.dose&&b.water?"1:"+Math.round(b.water/b.dose*10)/10:"?";var yld=b.bev!=null?b.bev:"?";ey.push({x:b.tds,y:b.ey,ratio:ratio,yld:yld})}});\n'
+  + '  if(ey.length){document.getElementById("eyWrap").innerHTML=\'<canvas id="cEY"></canvas>\';charts.ey=new Chart(document.getElementById("cEY"),{type:"scatter",data:{datasets:[{data:ey,backgroundColor:"#4B88A2",pointRadius:6}]},options:{scales:{x:{title:{display:true,text:"TDS %"}},y:{title:{display:true,text:"EY %"}}},plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){var p=ctx.raw;return "TDS: "+p.x+"% | EY: "+p.y+"% | "+p.ratio+" (yield: "+p.yld+"g)"}}}}}})}\n'
   + '  else{document.getElementById("eyWrap").innerHTML=\'<div class="empty-msg">No EY/TDS data</div>\'}\n'
-  /* Grind vs Score */
-  + '  var gr=[];fb.forEach(function(b){if(b.score!=null&&b.grind!=null)gr.push({x:b.grind,y:b.score})});\n'
-  + '  if(gr.length){document.getElementById("grWrap").innerHTML=\'<canvas id="cGr"></canvas>\';charts.gr=new Chart(document.getElementById("cGr"),{type:"scatter",data:{datasets:[{data:gr,backgroundColor:"#7B68A6",pointRadius:6}]},options:{scales:{x:{title:{display:true,text:"Grind Size"}},y:{title:{display:true,text:"Score"},min:0,max:10}},plugins:{legend:{display:false}}}})}\n'
+  /* Grind vs Score — per grinder datasets */
+  + '  var grByGrinder={};fb.forEach(function(b){if(b.score!=null&&b.grind!=null){var g=b.grinder||"Unknown";if(!grByGrinder[g])grByGrinder[g]=[];grByGrinder[g].push({x:b.grind,y:b.score})}});\n'
+  + '  var grDS=[];var gi=0;Object.keys(grByGrinder).forEach(function(g){grDS.push({label:g,data:grByGrinder[g],backgroundColor:colors[gi%colors.length],pointRadius:6});gi++});\n'
+  + '  if(grDS.length){document.getElementById("grWrap").innerHTML=\'<canvas id="cGr"></canvas>\';charts.gr=new Chart(document.getElementById("cGr"),{type:"scatter",data:{datasets:grDS},options:{scales:{x:{title:{display:true,text:"Grind Size"}},y:{title:{display:true,text:"Score"},min:0,max:10}}}})}\n'
   + '  else{document.getElementById("grWrap").innerHTML=\'<div class="empty-msg">No grind/score data</div>\'}\n'
   /* DOR vs Score */
   + '  var dor=[];fb.forEach(function(b){if(b.score!=null&&b.dor!=null)dor.push({x:b.dor,y:b.score})});\n'
