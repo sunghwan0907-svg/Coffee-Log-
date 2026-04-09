@@ -3784,7 +3784,8 @@ function exportChartReport() {
   + '    btn.onclick=function(){toggleRadar(i)};tBar.appendChild(btn);\n'
   + '  });\n'
   + '  document.getElementById("radarWrap").innerHTML=\'<canvas id="cRad"></canvas>\';\n'
-  + '  charts.rad=new Chart(document.getElementById("cRad"),{type:"radar",data:{labels:radarLabels,datasets:[]},options:{scales:{r:{min:0,max:9,ticks:{stepSize:1}}}}});\n'
+  + '  var lblColors=radarLabels.map(function(l){return l.indexOf("Bitter")>=0?"#8B0000":"#555"});\n'
+  + '  charts.rad=new Chart(document.getElementById("cRad"),{type:"radar",data:{labels:radarLabels,datasets:[]},options:{scales:{r:{min:0,max:9,ticks:{stepSize:1},pointLabels:{color:lblColors,font:{weight:function(ctx){return radarLabels[ctx.index].indexOf("Bitter")>=0?"700":"400"}}}}}}});\n'
   + '}\n'
   /* Toggle individual brew on radar */
   + 'function toggleRadar(idx){\n'
