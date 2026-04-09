@@ -687,12 +687,15 @@ body {
 .ds-search::placeholder { color: var(--dim); }
 
 /* Compare mode */
-.cmp-bar { display:flex; align-items:center; gap:8px; padding:0 16px 8px; }
-.cmp-toggle { flex-shrink:0; padding:7px 14px; border-radius:20px; font-size:13px; font-weight:700; border:none; cursor:pointer; font-family:inherit; background:var(--fill); color:var(--text2); transition:background .15s,color .15s; }
-.cmp-toggle.active { background:var(--accent); color:#fff; }
-.cmp-confirm-btn { display:none; padding:7px 14px; border-radius:20px; font-size:13px; font-weight:700; border:none; cursor:pointer; font-family:inherit; background:#4A7C59; color:#fff; }
+.cmp-icon-btn { flex-shrink:0; width:38px; height:38px; border-radius:10px; border:1.5px solid var(--sep); background:var(--bg2); color:var(--text3); display:flex; align-items:center; justify-content:center; cursor:pointer; transition:all .15s; }
+.cmp-icon-btn.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+.cmp-status-bar { display:none; padding:0 16px 10px; }
+.cmp-status-bar.show { display:block; }
+.cmp-status-inner { display:flex; align-items:center; gap:10px; background:#fff; border-radius:12px; padding:10px 14px; box-shadow:0 1px 4px rgba(0,0,0,.06); border:1.5px solid var(--sep); }
+.cmp-hint { font-size:13px; color:var(--text3); flex:1; }
+.cmp-confirm-btn { display:none; padding:7px 16px; border-radius:20px; font-size:13px; font-weight:700; border:none; cursor:pointer; font-family:inherit; background:#4A7C59; color:#fff; white-space:nowrap; }
 .cmp-confirm-btn.show { display:inline-block; }
-.cmp-hint { font-size:12px; color:var(--text3); flex:1; }
+.cmp-cancel-btn { width:28px; height:28px; border-radius:50%; border:none; background:var(--fill); color:var(--text3); font-size:14px; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
 .cmp-check { position:absolute; top:10px; right:10px; width:24px; height:24px; border-radius:50%; border:2px solid var(--sep); background:var(--bg2); display:none; align-items:center; justify-content:center; z-index:2; transition:border-color .12s,background .12s; cursor:pointer; }
 .cmp-mode .cmp-check { display:flex; }
 .cmp-check.checked { border-color:#4A7C59; background:#4A7C59; }
@@ -1174,17 +1177,19 @@ body {
 
     <!-- ══ DATASET ══════════════════════════════════════════════ -->
     <div class="tab-page" id="page-dataset">
-      <div class="ds-search-wrap">
-        <input type="text" id="dsSearch" class="ds-search" placeholder="Search beans, roasters…" oninput="renderDataset()">
+      <div class="ds-search-wrap" style="display:flex;align-items:center;gap:8px">
+        <input type="text" id="dsSearch" class="ds-search" placeholder="Search beans, roasters…" oninput="renderDataset()" style="flex:1">
+        <button class="cmp-icon-btn" id="cmpToggle" onclick="toggleCompareMode()" title="Compare brews">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+        </button>
       </div>
-      <div class="cmp-bar">
-        <div style="flex:1;display:flex;gap:6px;overflow-x:auto;-webkit-overflow-scrolling:touch" id="dsFilterBar"></div>
-        <button class="cmp-toggle" id="cmpToggle" onclick="toggleCompareMode()">Compare</button>
-      </div>
-      <div id="cmpStatus" style="display:none;padding:0 16px 8px;align-items:center;gap:8px">
-        <span class="cmp-hint" id="cmpHint">Select 2 brews to compare</span>
-        <button class="cmp-confirm-btn" id="cmpConfirmBtn" onclick="openCompareView()">Compare</button>
-        <button style="padding:6px 12px;border-radius:20px;font-size:13px;font-weight:600;border:none;cursor:pointer;font-family:inherit;background:var(--fill);color:var(--text2)" onclick="toggleCompareMode()">Cancel</button>
+      <div style="display:flex;gap:6px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding:0 16px 8px" id="dsFilterBar"></div>
+      <div class="cmp-status-bar" id="cmpStatus">
+        <div class="cmp-status-inner">
+          <span class="cmp-hint" id="cmpHint">Select 2 brews to compare</span>
+          <button class="cmp-confirm-btn" id="cmpConfirmBtn" onclick="openCompareView()">Compare ›</button>
+          <button class="cmp-cancel-btn" onclick="toggleCompareMode()">✕</button>
+        </div>
       </div>
       <div class="section" id="datasetSection"></div>
     </div>
@@ -2339,7 +2344,7 @@ function toggleCompareMode() {
   _cmpMode = !_cmpMode;
   _cmpSel.clear();
   document.getElementById('cmpToggle').classList.toggle('active', _cmpMode);
-  document.getElementById('cmpStatus').style.display = _cmpMode ? 'flex' : 'none';
+  document.getElementById('cmpStatus').classList.toggle('show', _cmpMode);
   document.getElementById('datasetSection').classList.toggle('cmp-mode', _cmpMode);
   updateCmpUI();
   renderDataset();
