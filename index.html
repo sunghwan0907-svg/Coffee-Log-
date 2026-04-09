@@ -686,6 +686,42 @@ body {
 .ds-search:focus { border-color: var(--accent); }
 .ds-search::placeholder { color: var(--dim); }
 
+/* Compare mode */
+.cmp-bar { display:flex; align-items:center; gap:8px; padding:0 16px 8px; }
+.cmp-toggle { flex-shrink:0; padding:7px 14px; border-radius:20px; font-size:13px; font-weight:700; border:none; cursor:pointer; font-family:inherit; background:var(--fill); color:var(--text2); transition:background .15s,color .15s; }
+.cmp-toggle.active { background:var(--accent); color:#fff; }
+.cmp-confirm-btn { display:none; padding:7px 14px; border-radius:20px; font-size:13px; font-weight:700; border:none; cursor:pointer; font-family:inherit; background:#4A7C59; color:#fff; }
+.cmp-confirm-btn.show { display:inline-block; }
+.cmp-hint { font-size:12px; color:var(--text3); flex:1; }
+.cmp-check { position:absolute; top:10px; right:10px; width:24px; height:24px; border-radius:50%; border:2px solid var(--sep); background:var(--bg2); display:none; align-items:center; justify-content:center; z-index:2; transition:border-color .12s,background .12s; cursor:pointer; }
+.cmp-mode .cmp-check { display:flex; }
+.cmp-check.checked { border-color:#4A7C59; background:#4A7C59; }
+.cmp-check.checked::after { content:''; display:block; width:6px; height:10px; border:solid #fff; border-width:0 2px 2px 0; transform:rotate(45deg); margin-top:-2px; }
+.brew-card { position:relative; }
+
+/* Compare overlay */
+.cmp-overlay .sheet { max-height:92vh; }
+.cmp-header { display:flex; justify-content:space-between; padding:0 20px 12px; gap:12px; }
+.cmp-col-hdr { flex:1; text-align:center; }
+.cmp-col-hdr .cmp-date { font-size:14px; font-weight:700; color:var(--text); }
+.cmp-col-hdr .cmp-bean { font-size:12px; color:var(--text3); margin-top:2px; }
+.cmp-section-title { font-size:11px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--text3); padding:16px 20px 6px; }
+.cmp-grid { display:grid; grid-template-columns:1fr auto 1fr; gap:0; padding:0 20px; }
+.cmp-grid-row { display:contents; }
+.cmp-grid-row > div { padding:8px 0; border-bottom:1px solid var(--sep2); font-size:14px; }
+.cmp-cell-l { text-align:right; padding-right:10px !important; }
+.cmp-cell-label { text-align:center; font-weight:600; color:var(--text3); font-size:12px; }
+.cmp-cell-r { text-align:left; padding-left:10px !important; }
+.cmp-better { color:#4A7C59; font-weight:600; }
+.cmp-worse { color:#C1666B; font-weight:600; }
+.cmp-arrow { font-size:12px; margin-left:2px; }
+.cmp-radar-wrap { padding:16px 20px; display:flex; justify-content:center; }
+.cmp-radar-wrap svg { max-width:280px; width:100%; }
+.cmp-summary { margin:0 20px 20px; padding:14px 16px; background:var(--fill); border-radius:12px; font-size:14px; line-height:1.5; color:var(--text2); }
+.cmp-legend { display:flex; justify-content:center; gap:16px; padding:0 20px 4px; font-size:12px; }
+.cmp-legend span { display:flex; align-items:center; gap:4px; }
+.cmp-legend .cmp-dot { width:10px; height:10px; border-radius:50%; }
+
 /* Flavour / Texture wheel */
 .wheel-container { padding: 12px !important; }
 .wheel-breadcrumb { display: flex; align-items: center; gap: 4px; padding: 0 4px 10px; flex-wrap: wrap; }
@@ -1141,7 +1177,15 @@ body {
       <div class="ds-search-wrap">
         <input type="text" id="dsSearch" class="ds-search" placeholder="Search beans, roasters…" oninput="renderDataset()">
       </div>
-      <div style="padding:0 16px 8px;display:flex;gap:6px;overflow-x:auto;-webkit-overflow-scrolling:touch" id="dsFilterBar"></div>
+      <div class="cmp-bar">
+        <div style="flex:1;display:flex;gap:6px;overflow-x:auto;-webkit-overflow-scrolling:touch" id="dsFilterBar"></div>
+        <button class="cmp-toggle" id="cmpToggle" onclick="toggleCompareMode()">Compare</button>
+      </div>
+      <div id="cmpStatus" style="display:none;padding:0 16px 8px;align-items:center;gap:8px">
+        <span class="cmp-hint" id="cmpHint">Select 2 brews to compare</span>
+        <button class="cmp-confirm-btn" id="cmpConfirmBtn" onclick="openCompareView()">Compare</button>
+        <button style="padding:6px 12px;border-radius:20px;font-size:13px;font-weight:600;border:none;cursor:pointer;font-family:inherit;background:var(--fill);color:var(--text2)" onclick="toggleCompareMode()">Cancel</button>
+      </div>
       <div class="section" id="datasetSection"></div>
     </div>
 
@@ -1350,6 +1394,18 @@ body {
       <button class="btn-primary" style="margin:0 16px 16px" id="saveBeanBtn" onclick="saveBean()">Add Bean</button>
       <button class="btn-destructive" style="margin:0 16px 16px;display:none;width:calc(100% - 32px)" id="delBeanBtn" onclick="askDeleteBean()">Delete Bean</button>
     </div>
+  </div>
+</div>
+
+<!-- Compare overlay -->
+<div class="overlay cmp-overlay" id="sCompare">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title" style="display:flex;align-items:center;justify-content:space-between">
+      <span>Compare Brews</span>
+      <button style="font-size:14px;font-weight:600;color:var(--accent);background:none;border:none;cursor:pointer;font-family:inherit;padding:4px 8px" onclick="closeSheet('sCompare')">Done</button>
+    </div>
+    <div class="sheet-scroll" id="cmpBody" style="padding-bottom:env(safe-area-inset-bottom)"></div>
   </div>
 </div>
 
@@ -2244,8 +2300,9 @@ function renderDataset() {
       <div class="brew-del-bg" onclick="askDelete('${brew.id}')">Delete</div>
       <div class="brew-card" id="card-${brew.id}"
         ontouchstart="ts(event,'${brew.id}')" ontouchmove="tm(event,'${brew.id}')" ontouchend="te(event,'${brew.id}')"
-        onclick="toggleBrewCard('${brew.id}')"
+        onclick="_cmpMode?cmpToggleSel('${brew.id}'):toggleBrewCard('${brew.id}')"
         oncontextmenu="openCtx(event,'${brew.id}')">
+        <div class="cmp-check${_cmpSel.has(brew.id)?' checked':''}" id="cmpChk-${brew.id}"></div>
         <div class="brew-bean">${esc(name)}${ageHtml(beanAge(bean, brew.date), 'brew-age-tag')}</div>
         <div class="brew-sub">${equip}</div>
         <div class="brew-stats">
@@ -2270,6 +2327,208 @@ function renderDataset() {
       </div>
     </div>`;
   }).join('');
+}
+
+/* ──────────────────────────────────────────────────────────────
+   Compare Mode
+────────────────────────────────────────────────────────────── */
+let _cmpMode = false;
+let _cmpSel = new Set();
+
+function toggleCompareMode() {
+  _cmpMode = !_cmpMode;
+  _cmpSel.clear();
+  document.getElementById('cmpToggle').classList.toggle('active', _cmpMode);
+  document.getElementById('cmpStatus').style.display = _cmpMode ? 'flex' : 'none';
+  document.getElementById('datasetSection').classList.toggle('cmp-mode', _cmpMode);
+  updateCmpUI();
+  renderDataset();
+}
+
+function cmpToggleSel(id) {
+  if (_cmpSel.has(id)) {
+    _cmpSel.delete(id);
+  } else if (_cmpSel.size < 2) {
+    _cmpSel.add(id);
+  }
+  updateCmpUI();
+  /* update checkboxes visually without full re-render */
+  document.querySelectorAll('.cmp-check').forEach(function(el) {
+    var bid = el.id.replace('cmpChk-','');
+    el.classList.toggle('checked', _cmpSel.has(bid));
+  });
+}
+
+function updateCmpUI() {
+  var n = _cmpSel.size;
+  var hint = document.getElementById('cmpHint');
+  var btn = document.getElementById('cmpConfirmBtn');
+  if (n === 0) hint.textContent = 'Select 2 brews to compare';
+  else if (n === 1) hint.textContent = '1 selected — pick one more';
+  else hint.textContent = '2 selected';
+  btn.classList.toggle('show', n === 2);
+}
+
+function openCompareView() {
+  var ids = Array.from(_cmpSel);
+  var a = brews.find(function(b){return b.id===ids[0]});
+  var b2 = brews.find(function(b){return b.id===ids[1]});
+  if (!a || !b2) return;
+  /* order by date: older first */
+  if ((a.date||'') > (b2.date||'')) { var tmp=a; a=b2; b2=tmp; }
+  var beanA = beans.find(function(x){return x.id===a.beanId});
+  var beanB = beans.find(function(x){return x.id===b2.beanId});
+  var nameA = beanA ? bdn(beanA) : 'Unknown';
+  var nameB = beanB ? bdn(beanB) : 'Unknown';
+
+  var html = '';
+  /* Header */
+  html += '<div class="cmp-header">';
+  html += '<div class="cmp-col-hdr"><div class="cmp-date">' + esc(a.date||'No date') + '</div><div class="cmp-bean">' + esc(nameA) + '</div></div>';
+  html += '<div style="color:var(--text3);font-size:13px;font-weight:700;align-self:center">vs</div>';
+  html += '<div class="cmp-col-hdr"><div class="cmp-date">' + esc(b2.date||'No date') + '</div><div class="cmp-bean">' + esc(nameB) + '</div></div>';
+  html += '</div>';
+
+  /* Recipe diff */
+  html += '<div class="cmp-section-title">Recipe</div>';
+  html += '<div class="cmp-grid">';
+  var recipeFields = [
+    {key:'grind',label:'Grind'},
+    {key:'dose',label:'Dose',unit:'g'},
+    {key:'water',label:'Water',unit:'g'},
+    {key:'temp',label:'Temp',unit:'°'},
+    {key:'bloom',label:'Bloom',unit:'s'},
+    {key:'totalTime',label:'Time',unit:'s'},
+    {key:'waterType',label:'Water Type'},
+    {key:'grinder',label:'Grinder'},
+    {key:'brewer',label:'Brewer'},
+    {key:'filter',label:'Filter'}
+  ];
+  recipeFields.forEach(function(f) {
+    var va = a[f.key]; var vb = b2[f.key];
+    var da = (va!=null&&va!=='') ? va + (f.unit||'') : '—';
+    var db = (vb!=null&&vb!=='') ? vb + (f.unit||'') : '—';
+    var cls = '';
+    if (va !== vb && va!=null && vb!=null && va!=='' && vb!=='') cls = ' style="font-weight:600;color:var(--accent)"';
+    html += '<div class="cmp-grid-row"><div class="cmp-cell-l"' + cls + '>' + esc(String(da)) + '</div>';
+    html += '<div class="cmp-cell-label">' + f.label + '</div>';
+    html += '<div class="cmp-cell-r"' + cls + '>' + esc(String(db)) + '</div></div>';
+  });
+  html += '</div>';
+
+  /* Results diff */
+  html += '<div class="cmp-section-title">Results</div>';
+  html += '<div class="cmp-grid">';
+  var resultFields = [
+    {key:'score',label:'Score',up:'better'},
+    {key:'ey',label:'EY %',up:'better'},
+    {key:'tds',label:'TDS',up:'neutral'},
+    {key:'beverageWeight',label:'Bev Weight',unit:'g',up:'neutral'}
+  ];
+  resultFields.forEach(function(f) {
+    var va = a[f.key]; var vb = b2[f.key];
+    var da = va!=null ? va + (f.unit||'') : '—';
+    var db = vb!=null ? vb + (f.unit||'') : '—';
+    var clsA = '', clsB = '', arrowB = '';
+    if (va!=null && vb!=null && f.up==='better') {
+      if (vb > va) { clsB = ' cmp-better'; arrowB = ' <span class="cmp-arrow">&#9650;</span>'; }
+      else if (vb < va) { clsB = ' cmp-worse'; arrowB = ' <span class="cmp-arrow">&#9660;</span>'; }
+    }
+    html += '<div class="cmp-grid-row"><div class="cmp-cell-l">' + esc(String(da)) + '</div>';
+    html += '<div class="cmp-cell-label">' + f.label + '</div>';
+    html += '<div class="cmp-cell-r' + clsB + '">' + esc(String(db)) + arrowB + '</div></div>';
+  });
+  html += '</div>';
+
+  /* Sensory radar (SVG) */
+  html += '<div class="cmp-section-title">Sensory Profile</div>';
+  html += '<div class="cmp-legend">';
+  html += '<span><span class="cmp-dot" style="background:rgba(200,85,58,0.7)"></span>Brew A</span>';
+  html += '<span><span class="cmp-dot" style="background:rgba(61,124,224,0.7)"></span>Brew B</span>';
+  html += '</div>';
+  html += '<div class="cmp-radar-wrap">' + buildRadarSVG(a, b2) + '</div>';
+
+  /* What changed summary */
+  html += '<div class="cmp-section-title">What Changed</div>';
+  html += '<div class="cmp-summary">' + buildChangeSummary(a, b2, nameA, nameB) + '</div>';
+
+  document.getElementById('cmpBody').innerHTML = html;
+  openSheet('sCompare');
+}
+
+function buildRadarSVG(a, b2) {
+  var labels = ['Hot Acidity','Hot Sweet','Cool Sweet','Cool Bitter','Hot Bitter','Cool Acidity'];
+  var vA = [
+    (a.hot&&a.hot.acidity)||0, (a.hot&&a.hot.sweetness)||0,
+    (a.cool&&a.cool.sweetness)||0, (a.cool&&a.cool.bitterness)||0,
+    (a.hot&&a.hot.bitterness)||0, (a.cool&&a.cool.acidity)||0
+  ];
+  var vB = [
+    (b2.hot&&b2.hot.acidity)||0, (b2.hot&&b2.hot.sweetness)||0,
+    (b2.cool&&b2.cool.sweetness)||0, (b2.cool&&b2.cool.bitterness)||0,
+    (b2.hot&&b2.hot.bitterness)||0, (b2.cool&&b2.cool.acidity)||0
+  ];
+  var cx=140, cy=140, maxR=110, n=6;
+  var svg = '<svg viewBox="0 0 280 280" xmlns="http://www.w3.org/2000/svg">';
+  /* grid rings */
+  for (var ring=1; ring<=4; ring++) {
+    var r = maxR * ring / 4;
+    var pts = [];
+    for (var i=0;i<n;i++) {
+      var ang = Math.PI*2*i/n - Math.PI/2;
+      pts.push((cx+r*Math.cos(ang)).toFixed(1)+','+(cy+r*Math.sin(ang)).toFixed(1));
+    }
+    svg += '<polygon points="'+pts.join(' ')+'" fill="none" stroke="var(--sep)" stroke-width="1"/>';
+  }
+  /* axes + labels */
+  for (var i=0;i<n;i++) {
+    var ang = Math.PI*2*i/n - Math.PI/2;
+    var ex = cx+maxR*Math.cos(ang), ey2 = cy+maxR*Math.sin(ang);
+    svg += '<line x1="'+cx+'" y1="'+cy+'" x2="'+ex.toFixed(1)+'" y2="'+ey2.toFixed(1)+'" stroke="var(--sep)" stroke-width="1"/>';
+    var lx = cx+(maxR+18)*Math.cos(ang), ly = cy+(maxR+18)*Math.sin(ang);
+    var anchor = 'middle';
+    if (Math.cos(ang) < -0.1) anchor = 'end';
+    else if (Math.cos(ang) > 0.1) anchor = 'start';
+    svg += '<text x="'+lx.toFixed(1)+'" y="'+(ly+4).toFixed(1)+'" text-anchor="'+anchor+'" font-size="10" fill="var(--text3)" font-weight="600">'+labels[i]+'</text>';
+  }
+  /* data polygons */
+  function polyStr(vals, color, opacity) {
+    var pts = [];
+    for (var i=0;i<n;i++) {
+      var r2 = maxR * (vals[i]||0) / 9;
+      var ang2 = Math.PI*2*i/n - Math.PI/2;
+      pts.push((cx+r2*Math.cos(ang2)).toFixed(1)+','+(cy+r2*Math.sin(ang2)).toFixed(1));
+    }
+    return '<polygon points="'+pts.join(' ')+'" fill="'+color+'" fill-opacity="'+opacity+'" stroke="'+color+'" stroke-width="2" stroke-opacity="0.8"/>';
+  }
+  svg += polyStr(vA, 'rgba(200,85,58,0.8)', '0.15');
+  svg += polyStr(vB, 'rgba(61,124,224,0.8)', '0.15');
+  svg += '</svg>';
+  return svg;
+}
+
+function buildChangeSummary(a, b2, nameA, nameB) {
+  var parts = [];
+  if (a.grind && b2.grind && a.grind !== b2.grind) parts.push('Grind changed from ' + a.grind + ' to ' + b2.grind);
+  if (a.dose && b2.dose && a.dose !== b2.dose) {
+    var diff = b2.dose - a.dose;
+    parts.push('Dose ' + (diff>0?'increased':'decreased') + ' by ' + Math.abs(diff).toFixed(1) + 'g');
+  }
+  if (a.water && b2.water && a.water !== b2.water) {
+    var diff = b2.water - a.water;
+    parts.push('Water ' + (diff>0?'increased':'decreased') + ' by ' + Math.abs(diff).toFixed(1) + 'g');
+  }
+  if (a.temp && b2.temp && a.temp !== b2.temp) parts.push('Temp went from ' + a.temp + ' to ' + b2.temp);
+  if (a.score!=null && b2.score!=null && a.score !== b2.score) {
+    var diff = b2.score - a.score;
+    parts.push('Score ' + (diff>0?'improved':'dropped') + ' by ' + Math.abs(diff) + ' points');
+  }
+  if (a.ey!=null && b2.ey!=null && a.ey !== b2.ey) {
+    var diff = b2.ey - a.ey;
+    parts.push('EY ' + (diff>0?'up':'down') + ' ' + Math.abs(diff).toFixed(1) + '%');
+  }
+  if (parts.length === 0) return 'Both brews have identical parameters.';
+  return parts.join('. ') + '.';
 }
 
 function toggleBrewCard(id) {
