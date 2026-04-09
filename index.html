@@ -4351,17 +4351,20 @@ async function copyAllData() {
   try {
     const data = { brews, beans, equipment: settings, ts: Date.now(), v: 1 };
     const json = JSON.stringify(data);
-    const encoded = 'BREWLOG:' + btoa(unescape(encodeURIComponent(json)));
+    const compressed = await _compress(json);
+    const encoded = 'BREWLOG2:' + compressed;
     await navigator.clipboard.writeText(encoded);
     const count = brews.length + beans.length;
-    showToast('Copied! ' + count + ' items');
+    const kb = Math.round(encoded.length / 1024);
+    showToast('Copied! ' + count + ' items (' + kb + 'KB)');
     syncLog(brews.length + ' brews + ' + beans.length + ' beans copied to clipboard');
   } catch(e) {
     /* fallback: select a temporary textarea */
     try {
       const data = { brews, beans, equipment: settings, ts: Date.now(), v: 1 };
       const json = JSON.stringify(data);
-      const encoded = 'BREWLOG:' + btoa(unescape(encodeURIComponent(json)));
+      const compressed = await _compress(json);
+      const encoded = 'BREWLOG2:' + compressed;
       const ta = document.createElement('textarea');
       ta.value = encoded;
       ta.style.cssText = 'position:fixed;left:-9999px';
@@ -4390,13 +4393,19 @@ async function pasteAllData() {
     text = text.trim();
     if (!text) { showToast('Nothing to paste'); return; }
 
-    if (!text.startsWith('BREWLOG:')) {
+    let json;
+    if (text.startsWith('BREWLOG2:')) {
+      /* compressed format */
+      json = await _decompress(text.slice(9));
+    } else if (text.startsWith('BREWLOG:')) {
+      /* legacy uncompressed */
+      json = decodeURIComponent(escape(atob(text.slice(8))));
+    } else {
       showToast('Invalid sync data');
-      syncLog('Paste a code that starts with BREWLOG:');
+      syncLog('Paste a valid sync code');
       return;
     }
 
-    const json = decodeURIComponent(escape(atob(text.slice(8))));
     const data = JSON.parse(json);
 
     let added = 0;
