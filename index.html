@@ -1224,10 +1224,6 @@ body {
           <div class="stat-card"><div class="stat-val" id="stEY">—</div><div class="stat-label">Avg EY</div></div>
         </div>
       </div>
-      <div class="section">
-        <div class="section-header">Sensory Profile</div>
-        <div class="group" style="padding:14px 16px"><div id="sensoryBars"></div></div>
-      </div>
       <div class="section" style="margin-bottom:8px">
         <div class="section-header">Recent Brews</div>
         <div class="group" id="recentBrews"></div>
@@ -2541,29 +2537,6 @@ function renderStats() {
   document.getElementById('stBeans').textContent = beans.length;
   document.getElementById('stScore').textContent = scored.length ? (scored.reduce((s,b)=>s+b.score,0)/scored.length).toFixed(1) : '—';
   document.getElementById('stEY').textContent    = withEY.length ? (withEY.reduce((s,b)=>s+b.ey,0)/withEY.length).toFixed(1)+'%' : '—';
-
-  const barsEl = document.getElementById('sensoryBars');
-  if (!brews.length) {
-    barsEl.innerHTML = '<div style="color:var(--text3);font-size:14px;text-align:center;padding:6px 0">No data yet</div>';
-  } else {
-    const bars = [
-      { label: 'Aroma',         cls: 'bar-aroma',   val: avg(brews.map(b => b.aroma?.intensity).filter(Boolean)) },
-      { label: 'Hot acidity',   cls: 'bar-acidity', val: avg(brews.map(b => b.hot?.acidity).filter(Boolean)) },
-      { label: 'Hot sweetness', cls: 'bar-sweet',   val: avg(brews.map(b => b.hot?.sweetness).filter(Boolean)) },
-      { label: 'Hot bitterness',cls: 'bar-bitter',  val: avg(brews.map(b => b.hot?.bitterness).filter(Boolean)) },
-      { label: 'Cool acidity',  cls: 'bar-cool',    val: avg(brews.map(b => b.cool?.acidity).filter(Boolean)) },
-    ];
-    barsEl.innerHTML = bars.map(bar => `
-      <div class="bar-row">
-        <div class="bar-hdr">
-          <span class="bar-name">${bar.label}</span>
-          <span class="bar-num">${bar.val ? bar.val.toFixed(1) : '—'} / 9</span>
-        </div>
-        <div class="bar-track">
-          <div class="bar-fill ${bar.cls}" style="width:${bar.val?(bar.val/9*100).toFixed(1):0}%"></div>
-        </div>
-      </div>`).join('');
-  }
 
   const recentEl = document.getElementById('recentBrews');
   const recent   = brews.slice(0, 5);
