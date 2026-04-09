@@ -954,6 +954,11 @@ body {
             <span class="row-value" id="filterDisplay">Select</span>
             <span class="row-chevron">›</span>
           </div>
+          <div class="row row-tappable" onclick="openWaterPicker()">
+            <span class="row-label">Water</span>
+            <span class="row-value" id="waterDisplay">Select</span>
+            <span class="row-chevron">›</span>
+          </div>
         </div>
       </div>
 
@@ -1287,6 +1292,19 @@ body {
   </div>
 </div>
 
+<!-- Water picker -->
+<div class="overlay" id="sWater">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">Select Water</div>
+    <div class="sheet-scroll" id="waterList"></div>
+    <div id="waterCustomWrap" style="display:none;padding:0 16px 16px">
+      <input type="text" id="waterCustomInput" placeholder="Enter water type" style="width:100%;padding:12px;border-radius:10px;border:none;background:var(--fill);font-size:16px;font-family:inherit;color:var(--text);outline:none">
+      <button class="btn-primary" style="margin:12px 0 0" onclick="confirmCustomWater()">Confirm</button>
+    </div>
+  </div>
+</div>
+
 <!-- Date picker -->
 <div class="overlay" id="sDate">
   <div class="sheet">
@@ -1413,6 +1431,8 @@ let selBean      = null;
 let selGrinder   = null;
 let selBrewer    = null;
 let selFilter    = null;
+let selWater     = null;
+const WATER_PRESETS = ['Filtered Tap - Home', 'VOSS'];
 let cvRows       = [];
 let ss           = { hA:5, hS:5, hB:5, cA:5, cS:5, cB:5 }; // sensory state
 let intState     = { aroma: '', hot: '', cool: '' }; // intensity: Low, Med-Low, Med, Med-High, High
@@ -1470,6 +1490,7 @@ function restoreDraft() {
   setDisp('grinderDisplay', selGrinder, 'Select');
   setDisp('brewerDisplay',  selBrewer,  'Select');
   setDisp('filterDisplay',  selFilter,  'Select');
+  setDisp('waterDisplay',   selWater,   'Select');
   recalcEY();
   TAB_CFG.log.title = editBrewId ? 'Edit Brew' : 'New Brew';
   document.getElementById('hTitle').textContent = TAB_CFG.log.title;
@@ -1863,6 +1884,35 @@ function pickEquip(val) {
   closeSheet('sEquip');
 }
 
+/* ── Water picker ── */
+function openWaterPicker() {
+  const el = document.getElementById('waterList');
+  const options = [...WATER_PRESETS, 'Custom'];
+  el.innerHTML = options.map(item => `
+    <div class="pick-row${item===selWater?' selected':''}" onclick="${item==='Custom'?'showCustomWater()':'pickWater(\\\''+esc(item)+'\\\')'}">
+      <div class="pick-main">${esc(item)}</div>
+      <span class="pick-check">✓</span>
+    </div>`).join('');
+  document.getElementById('waterCustomWrap').style.display = 'none';
+  openSheet('sWater');
+}
+function pickWater(val) {
+  selWater = val;
+  const d = document.getElementById('waterDisplay');
+  d.textContent = val;
+  d.style.color = 'var(--text)';
+  closeSheet('sWater');
+}
+function showCustomWater() {
+  document.getElementById('waterCustomWrap').style.display = 'block';
+  document.getElementById('waterCustomInput').value = '';
+  document.getElementById('waterCustomInput').focus();
+}
+function confirmCustomWater() {
+  const val = document.getElementById('waterCustomInput').value.trim();
+  if (val) pickWater(val);
+}
+
 /* ──────────────────────────────────────────────────────────────
    Save brew
 ────────────────────────────────────────────────────────────── */
@@ -1881,6 +1931,7 @@ function saveBrew() {
     grinder: selGrinder,
     brewer:  selBrewer,
     filter:  selFilter,
+    waterType: selWater,
     dose, water,
     temp:        nv('lTemp'),
     grind:       v('lGrind'),
@@ -1942,6 +1993,9 @@ function resetLogForm() {
   document.getElementById('brewerDisplay').style.color  = '';
   document.getElementById('filterDisplay').textContent  = 'Select';
   document.getElementById('filterDisplay').style.color  = '';
+  document.getElementById('waterDisplay').textContent   = 'Select';
+  document.getElementById('waterDisplay').style.color   = '';
+  selWater = null;
   document.getElementById('eyVal').textContent = '—';
   brewFrozen = false; brewDOR = null;
   document.getElementById('dorInput').value = '';
@@ -2315,6 +2369,7 @@ function editBrewOpen(e, id) {
   selGrinder = brew.grinder;
   selBrewer  = brew.brewer;
   selFilter  = brew.filter;
+  selWater   = brew.waterType || null;
 
   const bean = beans.find(b => b.id === brew.beanId);
   const bd = document.getElementById('beanDisplay');
@@ -2324,6 +2379,7 @@ function editBrewOpen(e, id) {
   setDisp('grinderDisplay', brew.grinder, 'Select');
   setDisp('brewerDisplay',  brew.brewer,  'Select');
   setDisp('filterDisplay',  brew.filter,  'Select');
+  setDisp('waterDisplay',   selWater,     'Select');
 
   setV('lName',  brew.name);
   setV('lDose',  brew.dose);
@@ -2380,6 +2436,7 @@ function cloneBrew(e, id) {
   selGrinder = brew.grinder;
   selBrewer  = brew.brewer;
   selFilter  = brew.filter;
+  selWater   = brew.waterType || null;
 
   const bean = beans.find(b => b.id === brew.beanId);
   const bd = document.getElementById('beanDisplay');
@@ -2389,6 +2446,7 @@ function cloneBrew(e, id) {
   setDisp('grinderDisplay', brew.grinder, 'Select');
   setDisp('brewerDisplay',  brew.brewer,  'Select');
   setDisp('filterDisplay',  brew.filter,  'Select');
+  setDisp('waterDisplay',   selWater,     'Select');
 
   setV('lName',  brew.name);
   setV('lDose',  brew.dose);
@@ -3349,7 +3407,7 @@ function exportXLSX() {
     '#': 'id', 'Date': 'id', 'Session': 'id', 'Score': 'score',
     'Roaster': 'bean', 'Farm': 'bean', 'Region': 'bean', 'Processing': 'bean', 'Varietal': 'bean', 'Other': 'bean', 'DOR': 'bean', 'Frozen': 'bean',
     'Grind': 'recipe', 'Dose': 'recipe', 'Water': 'recipe', 'Ratio': 'recipe', 'Temp': 'recipe', 'Bloom': 'recipe', 'Time': 'recipe',
-    'Grinder': 'equip', 'Brewer': 'equip', 'Filter': 'equip',
+    'Grinder': 'equip', 'Brewer': 'equip', 'Filter': 'equip', 'Water Type': 'equip',
     'Bev Wt': 'extract', 'TDS': 'extract', 'EY': 'extract',
     'Aroma': 'sensory', 'Aroma Notes': 'sensory',
     'H-Acid': 'sensory', 'H-Sweet': 'sensory', 'H-Bitter': 'sensory', 'Hot Notes': 'sensory',
@@ -3441,6 +3499,7 @@ function exportXLSX() {
       'Grinder': b.grinder || '',
       'Brewer': b.brewer || '',
       'Filter': b.filter || '',
+      'Water Type': b.waterType || '',
       'Bev Wt': num(b.beverageWeight),
       'TDS': num(b.tds),
       'EY': num(b.ey),
