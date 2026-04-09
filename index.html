@@ -3750,57 +3750,51 @@ function exportChartReport() {
 
   const colors = ['#4A7C59','#C1666B','#4B88A2','#D4A574','#7B68A6','#48A9A6','#E07A5F'];
 
-  const html = `<!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Coach Report – ${new Date().toLocaleDateString()}</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
-<style>
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f5f0eb;color:#2c2c2c;padding:24px;max-width:1100px;margin:0 auto}
-  h1{font-size:22px;margin-bottom:4px;color:#1B2A4A}
-  .sub{font-size:13px;color:#888;margin-bottom:28px}
-  .card{background:#fff;border-radius:12px;padding:20px;margin-bottom:20px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
-  .card h2{font-size:15px;color:#1B2A4A;margin-bottom:12px;text-transform:uppercase;letter-spacing:.5px}
-  canvas{width:100%!important;max-height:350px}
-  .grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
-  @media(max-width:700px){.grid{grid-template-columns:1fr}}
-</style></head><body>
-<h1>Brew Coach Report</h1>
-<div class="sub">Generated ${new Date().toLocaleDateString('en-AU',{weekday:'long',year:'numeric',month:'long',day:'numeric'})} · ${sorted.length} brews</div>
+  const radarHtml = radarDatasets.length
+    ? '<div class="card"><h2>Sensory Profiles (Axil Beans \u2013 Latest Brew)</h2><canvas id="c6"></canvas></div>'
+    : '';
+  const radarJs = radarDatasets.length
+    ? "C('c6',{type:'radar',data:{labels:" + JSON.stringify(radarLabels) + ",datasets:" + JSON.stringify(radarDatasets.map((ds,i)=>({...ds,borderColor:colors[i%colors.length],backgroundColor:colors[i%colors.length]+'33',pointRadius:3}))) + "},options:{scales:{r:{min:0,max:9,ticks:{stepSize:1}}}}});"
+    : '';
 
-<div class="card"><h2>Score Progression</h2><canvas id="c1"></canvas></div>
-<div class="grid">
-  <div class="card"><h2>EY vs TDS</h2><canvas id="c2"></canvas></div>
-  <div class="card"><h2>Grind Size vs Score</h2><canvas id="c3"></canvas></div>
-  <div class="card"><h2>Days Off Roast vs Score</h2><canvas id="c4"></canvas></div>
-  <div class="card"><h2>Bean Comparison (Avg Score)</h2><canvas id="c5"></canvas></div>
-</div>
-${radarDatasets.length ? '<div class="card"><h2>Sensory Profiles (Axil Beans – Latest Brew)</h2><canvas id="c6"></canvas></div>' : ''}
+  const grindScatterDS = Object.entries(grindScoreData).map(([name, pts], i) => ({
+    label: name, data: pts, backgroundColor: colors[i % colors.length], pointRadius: 6
+  }));
 
-<script>
-const C = (id,cfg) => new Chart(document.getElementById(id), cfg);
-const colors = ${JSON.stringify(colors)};
-
-// 1 — Score Progression
-C('c1',{type:'line',data:{labels:${JSON.stringify(dates)},datasets:[{label:'Score',data:${JSON.stringify(scores)},borderColor:'#4A7C59',backgroundColor:'rgba(74,124,89,.1)',fill:true,tension:.3,spanGaps:true,pointRadius:4}]},options:{scales:{y:{min:0,max:100,title:{display:true,text:'Score'}},x:{title:{display:true,text:'Date'}}},plugins:{legend:{display:false}}}});
-
-// 2 — EY vs TDS
-C('c2',{type:'scatter',data:{datasets:[{label:'EY vs TDS',data:${JSON.stringify(eyTdsData)},backgroundColor:'#4B88A2',pointRadius:6}]},options:{scales:{x:{title:{display:true,text:'TDS %'}},y:{title:{display:true,text:'EY %'}}},plugins:{legend:{display:false}}}});
-
-// 3 — Grind vs Score (per bean)
-C('c3',{type:'scatter',data:{datasets:${JSON.stringify(Object.entries(grindScoreData).map(([name, pts], i) => ({
-  label: name, data: pts, backgroundColor: colors[i % colors.length], pointRadius: 6
-})))}},options:{scales:{x:{title:{display:true,text:'Grind Size'}},y:{title:{display:true,text:'Score'},min:0,max:100}}}});
-
-// 4 — DOR vs Score
-C('c4',{type:'scatter',data:{datasets:[{label:'DOR vs Score',data:${JSON.stringify(dorScoreData)},backgroundColor:'#D4A574',pointRadius:6}]},options:{scales:{x:{title:{display:true,text:'Days Off Roast'}},y:{title:{display:true,text:'Score'},min:0,max:100}},plugins:{legend:{display:false}}}});
-
-// 5 — Bean Comparison
-C('c5',{type:'bar',data:{labels:${JSON.stringify(beanLabels)},datasets:[{label:'Avg Score',data:${JSON.stringify(beanAvgs)},backgroundColor:${JSON.stringify(beanLabels.map((_,i)=>colors[i%colors.length]))}}]},options:{indexAxis:'y',scales:{x:{min:0,max:100,title:{display:true,text:'Score'}}},plugins:{legend:{display:false},tooltip:{callbacks:{afterLabel:function(ctx){return 'Brews: '+${JSON.stringify(beanCounts)}[ctx.dataIndex]}}}}}});
-
-// 6 — Sensory Radar
-${radarDatasets.length ? `C('c6',{type:'radar',data:{labels:${JSON.stringify(radarLabels)},datasets:${JSON.stringify(radarDatasets.map((ds,i)=>({...ds,borderColor:colors[i%colors.length],backgroundColor:colors[i%colors.length]+'33',pointRadius:3})))}},options:{scales:{r:{min:0,max:9,ticks:{stepSize:1}}}}});` : ''}
-</script></body></html>`;
+  const html = '<!DOCTYPE html>\n<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">\n'
+    + '<title>Coach Report \u2013 ' + new Date().toLocaleDateString() + '</title>\n'
+    + '<script src="https://cdn.jsdelivr.net/npm/chart.js@4"><' + '/script>\n'
+    + '<style>'
+    + '*{box-sizing:border-box;margin:0;padding:0}'
+    + 'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#f5f0eb;color:#2c2c2c;padding:24px;max-width:1100px;margin:0 auto}'
+    + 'h1{font-size:22px;margin-bottom:4px;color:#1B2A4A}'
+    + '.sub{font-size:13px;color:#888;margin-bottom:28px}'
+    + '.card{background:#fff;border-radius:12px;padding:20px;margin-bottom:20px;box-shadow:0 1px 4px rgba(0,0,0,.06)}'
+    + '.card h2{font-size:15px;color:#1B2A4A;margin-bottom:12px;text-transform:uppercase;letter-spacing:.5px}'
+    + 'canvas{width:100%!important;max-height:350px}'
+    + '.grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}'
+    + '@media(max-width:700px){.grid{grid-template-columns:1fr}}'
+    + '</style></head><body>\n'
+    + '<h1>Brew Coach Report</h1>\n'
+    + '<div class="sub">Generated ' + new Date().toLocaleDateString('en-AU',{weekday:'long',year:'numeric',month:'long',day:'numeric'}) + ' \u00b7 ' + sorted.length + ' brews</div>\n'
+    + '<div class="card"><h2>Score Progression</h2><canvas id="c1"></canvas></div>\n'
+    + '<div class="grid">'
+    + '<div class="card"><h2>EY vs TDS</h2><canvas id="c2"></canvas></div>'
+    + '<div class="card"><h2>Grind Size vs Score</h2><canvas id="c3"></canvas></div>'
+    + '<div class="card"><h2>Days Off Roast vs Score</h2><canvas id="c4"></canvas></div>'
+    + '<div class="card"><h2>Bean Comparison (Avg Score)</h2><canvas id="c5"></canvas></div>'
+    + '</div>\n'
+    + radarHtml + '\n'
+    + '<script>\n'
+    + 'var C = function(id,cfg){return new Chart(document.getElementById(id), cfg)};\n'
+    + 'var colors = ' + JSON.stringify(colors) + ';\n'
+    + "C('c1',{type:'line',data:{labels:" + JSON.stringify(dates) + ",datasets:[{label:'Score',data:" + JSON.stringify(scores) + ",borderColor:'#4A7C59',backgroundColor:'rgba(74,124,89,.1)',fill:true,tension:.3,spanGaps:true,pointRadius:4}]},options:{scales:{y:{min:0,max:100,title:{display:true,text:'Score'}},x:{title:{display:true,text:'Date'}}},plugins:{legend:{display:false}}}});\n"
+    + "C('c2',{type:'scatter',data:{datasets:[{label:'EY vs TDS',data:" + JSON.stringify(eyTdsData) + ",backgroundColor:'#4B88A2',pointRadius:6}]},options:{scales:{x:{title:{display:true,text:'TDS %'}},y:{title:{display:true,text:'EY %'}}},plugins:{legend:{display:false}}}});\n"
+    + "C('c3',{type:'scatter',data:{datasets:" + JSON.stringify(grindScatterDS) + "},options:{scales:{x:{title:{display:true,text:'Grind Size'}},y:{title:{display:true,text:'Score'},min:0,max:100}}}});\n"
+    + "C('c4',{type:'scatter',data:{datasets:[{label:'DOR vs Score',data:" + JSON.stringify(dorScoreData) + ",backgroundColor:'#D4A574',pointRadius:6}]},options:{scales:{x:{title:{display:true,text:'Days Off Roast'}},y:{title:{display:true,text:'Score'},min:0,max:100}},plugins:{legend:{display:false}}}});\n"
+    + "C('c5',{type:'bar',data:{labels:" + JSON.stringify(beanLabels) + ",datasets:[{label:'Avg Score',data:" + JSON.stringify(beanAvgs) + ",backgroundColor:" + JSON.stringify(beanLabels.map((_,i)=>colors[i%colors.length])) + "}]},options:{indexAxis:'y',scales:{x:{min:0,max:100,title:{display:true,text:'Score'}}},plugins:{legend:{display:false}}}});\n"
+    + radarJs + '\n'
+    + '<' + '/script></body></html>';
 
   const blob = new Blob([html], { type: 'text/html' });
   const url = URL.createObjectURL(blob);
