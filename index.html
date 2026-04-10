@@ -2722,13 +2722,13 @@ function cloneBrew(e, id) {
   setV('lTemp',  brew.temp);
   setV('lGrind', brew.grind);
   setV('lBloom', brew.bloom);
-  setV('lTime',  brew.totalTime);
-  setV('lBev',   '');  // clear extraction — new brew
+  setV('lTime',  '');  // output — clear
+  setV('lBev',   '');  // output — clear
   setV('lTDS',   '');
   setV('lScore', '');
   setV('lRecipeNotes', brew.recipeNotes);
-  setV('lNotes', brew.notes);
-  setV('lAdjust', brew.adjust);
+  setV('lNotes', '');  // output — clear
+  setV('lAdjust', '');
   setV('aromaNotes', '');
   setV('hotNotes',   '');
   setV('coolNotes',  '');

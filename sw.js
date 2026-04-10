@@ -1,4 +1,4 @@
-const CACHE = 'brewlog-v11';
+const CACHE = 'brewlog-v12';
 
 self.addEventListener('install', e => {
   self.skipWaiting();
