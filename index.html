@@ -1328,10 +1328,21 @@ body {
         </div>
       </div>
       <div id="cupScoring" style="display:none">
-        <div id="cupScoreForms"></div>
-        <div style="padding:0 16px 20px">
-          <button onclick="saveCupSession()" class="btn-primary" style="width:100%;padding:14px;border-radius:12px;font-size:16px;font-weight:600;border:none;color:#fff;background:var(--c-cupping);cursor:pointer">Save Session</button>
-          <button onclick="cancelCupping()" style="width:100%;padding:12px;border-radius:12px;font-size:14px;border:1.5px solid var(--border);background:none;color:var(--text2);cursor:pointer;margin-top:8px">Cancel</button>
+        <!-- Cup picker list -->
+        <div id="cupPickerView">
+          <div id="cupPickerList"></div>
+          <div style="padding:12px 16px 20px">
+            <button onclick="saveCupSession()" class="btn-primary" style="width:100%;padding:14px;border-radius:12px;font-size:16px;font-weight:600;border:none;color:#fff;background:var(--c-cupping);cursor:pointer">Save Session</button>
+            <button onclick="cancelCupping()" style="width:100%;padding:12px;border-radius:12px;font-size:14px;border:1.5px solid var(--border);background:none;color:var(--text2);cursor:pointer;margin-top:8px">Cancel</button>
+          </div>
+        </div>
+        <!-- Single cup detail -->
+        <div id="cupDetailView" style="display:none">
+          <div id="cupDetailHeader"></div>
+          <div id="cupDetailForm"></div>
+          <div style="padding:12px 16px 20px">
+            <button onclick="cupBackToList()" style="width:100%;padding:14px;border-radius:12px;font-size:16px;font-weight:600;border:none;color:#fff;background:var(--c-cupping);cursor:pointer">&larr; Back to Cups</button>
+          </div>
         </div>
       </div>
       <div class="section">
@@ -2920,94 +2931,14 @@ function _cupSectionLabel(text, color) {
   return '<div style="padding:14px 16px 8px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:' + (color || 'var(--text3)') + '">' + text + '</div>';
 }
 
+/* Track notes per cup so we can autosave/restore */
+window._cupNotes = [];
+
 function startCupping() {
   if (!cupEntries.length) return;
   document.getElementById('cupSetup').style.display = 'none';
   document.getElementById('cupScoring').style.display = '';
-  const forms = document.getElementById('cupScoreForms');
-  forms.innerHTML = cupEntries.map(function(e, i) {
-    const bean = beans.find(function(b) { return b.id === e.beanId; });
-    const name = bean ? bdn(bean) : 'Unknown';
-    const noteStr = e.note || '';
-    var html = '';
-
-    /* ── Cup header ── */
-    html += '<div style="padding:20px 16px 12px">'
-      + '<div style="font-size:13px;font-weight:600;color:var(--c-cupping);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Cup ' + (i + 1) + '</div>'
-      + '<div style="font-size:18px;font-weight:700;color:var(--text)">' + name + '</div>'
-      + (noteStr ? '<div style="font-size:13px;color:var(--text3);margin-top:2px">' + noteStr + '</div>' : '')
-      + '</div>';
-
-    /* ── Aroma card ── */
-    html += _cupSectionLabel('Aroma', 'var(--aroma)');
-    html += _cupCard(
-      '<div style="padding:14px 16px;border-bottom:1px solid rgba(0,0,0,.04)">'
-      + '<div style="font-size:12px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Dry</div>'
-      + _cupNotesRow(i, 'dryAroma')
-      + '</div>'
-      + '<div style="padding:14px 16px">'
-      + '<div style="font-size:12px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Wet</div>'
-      + _cupNotesRow(i, 'wetAroma')
-      + '</div>'
-    );
-
-    /* ── Hot card ── */
-    html += _cupSectionLabel('Hot', 'var(--hot)');
-    html += _cupCard('<div style="padding:4px 16px 8px">'
-      + _cupScoreRow(i, 'hot', 'acidity', 'Acidity')
-      + _cupScoreRow(i, 'hot', 'sweetness', 'Sweetness')
-      + _cupScoreRow(i, 'hot', 'bitterness', 'Bitterness')
-      + _cupScoreRow(i, 'hot', 'body', 'Body')
-      + '</div>'
-    );
-
-    /* ── Cool card ── */
-    html += _cupSectionLabel('Cool', 'var(--cool)');
-    html += _cupCard('<div style="padding:4px 16px 8px">'
-      + _cupScoreRow(i, 'cool', 'acidity', 'Acidity')
-      + _cupScoreRow(i, 'cool', 'sweetness', 'Sweetness')
-      + _cupScoreRow(i, 'cool', 'bitterness', 'Bitterness')
-      + _cupScoreRow(i, 'cool', 'body', 'Body')
-      + '</div>'
-    );
-
-    /* ── Flavour Quality card ── */
-    html += _cupSectionLabel('Flavour Quality', 'var(--c-cupping)');
-    html += _cupCard(
-      '<div style="padding:16px;display:flex;align-items:center;justify-content:space-between">'
-      + '<div style="font-size:15px;font-weight:600;color:var(--text)">Score</div>'
-      + '<div style="display:flex;align-items:center;gap:12px">'
-      + '<button onclick="cupAdjFQ(' + i + ',-0.5)" style="width:36px;height:36px;border-radius:50%;border:none;background:var(--bg);font-size:18px;cursor:pointer;color:var(--text);font-weight:500;transition:all .15s">\u2212</button>'
-      + '<div style="min-width:48px;text-align:center"><span id="cupFQ' + i + '" style="font-size:28px;font-weight:700;color:var(--c-cupping)">0</span><span style="font-size:14px;color:var(--text3);font-weight:500"> /10</span></div>'
-      + '<button onclick="cupAdjFQ(' + i + ',0.5)" style="width:36px;height:36px;border-radius:50%;border:none;background:var(--bg);font-size:18px;cursor:pointer;color:var(--text);font-weight:500;transition:all .15s">+</button>'
-      + '</div></div>'
-    );
-
-    /* ── Notes cards ── */
-    html += _cupSectionLabel('Notes');
-    html += _cupCard(
-      '<div style="padding:14px 16px;border-bottom:1px solid rgba(0,0,0,.04)">'
-      + '<div style="font-size:12px;font-weight:600;color:#4A7C59;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">What I Like</div>'
-      + _cupNotesRow(i, 'like')
-      + '</div>'
-      + '<div style="padding:14px 16px;border-bottom:1px solid rgba(0,0,0,.04)">'
-      + '<div style="font-size:12px;font-weight:600;color:#C1666B;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">What I Don\'t Like</div>'
-      + _cupNotesRow(i, 'dislike')
-      + '</div>'
-      + '<div style="padding:14px 16px">'
-      + '<div style="font-size:12px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Additional</div>'
-      + _cupNotesRow(i, 'extra')
-      + '</div>'
-    );
-
-    /* Divider between cups */
-    if (i < cupEntries.length - 1) {
-      html += '<div style="height:2px;background:var(--border);margin:20px 16px"></div>';
-    }
-
-    return html;
-  }).join('');
-  // Init score state
+  /* Init score + notes state */
   window._cupScores = cupEntries.map(function() {
     return {
       hot: { acidity: null, sweetness: null, bitterness: null, body: null },
@@ -3015,6 +2946,187 @@ function startCupping() {
       fq: 0
     };
   });
+  window._cupNotes = cupEntries.map(function() {
+    return { dryAroma: '', wetAroma: '', like: '', dislike: '', extra: '' };
+  });
+  renderCupPicker();
+}
+
+function _cupStatus(i) {
+  var s = window._cupScores[i];
+  var n = window._cupNotes[i];
+  var filled = 0;
+  ['acidity','sweetness','bitterness','body'].forEach(function(k) {
+    if (s.hot[k] != null) filled++;
+    if (s.cool[k] != null) filled++;
+  });
+  if (s.fq > 0) filled++;
+  if (n.dryAroma || n.wetAroma) filled++;
+  if (n.like || n.dislike || n.extra) filled++;
+  if (filled === 0) return { text: 'Not started', color: 'var(--text3)', dot: 'var(--border)' };
+  if (filled >= 9) return { text: 'Complete', color: '#4A7C59', dot: '#4A7C59' };
+  return { text: 'In progress', color: 'var(--c-cupping)', dot: 'var(--c-cupping)' };
+}
+
+function renderCupPicker() {
+  document.getElementById('cupPickerView').style.display = '';
+  document.getElementById('cupDetailView').style.display = 'none';
+  var sessionName = (document.getElementById('cupSessionName') || {}).value || '';
+  var html = '<div style="padding:20px 16px 8px">'
+    + '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--c-cupping);margin-bottom:4px">' + (sessionName || 'Cupping Session') + '</div>'
+    + '<div style="font-size:14px;color:var(--text3)">' + cupEntries.length + ' cup' + (cupEntries.length !== 1 ? 's' : '') + '</div>'
+    + '</div>';
+  html += cupEntries.map(function(e, i) {
+    var bean = beans.find(function(b) { return b.id === e.beanId; });
+    var name = bean ? bdn(bean) : 'Unknown';
+    var st = _cupStatus(i);
+    var fq = window._cupScores[i].fq;
+    return '<div onclick="openCupDetail(' + i + ')" style="margin:6px 16px;background:var(--card);border-radius:14px;padding:16px;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.04);display:flex;align-items:center;gap:14px;transition:transform .1s;-webkit-tap-highlight-color:transparent">'
+      + '<div style="width:44px;height:44px;border-radius:12px;background:var(--bg);display:flex;align-items:center;justify-content:center;flex-shrink:0">'
+      + '<span style="font-size:18px;font-weight:700;color:var(--c-cupping)">' + (i + 1) + '</span></div>'
+      + '<div style="flex:1;min-width:0">'
+      + '<div style="font-size:15px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + name + '</div>'
+      + (e.note ? '<div style="font-size:12px;color:var(--text3);margin-top:1px">' + e.note + '</div>' : '')
+      + '<div style="display:flex;align-items:center;gap:6px;margin-top:4px">'
+      + '<div style="width:6px;height:6px;border-radius:50%;background:' + st.dot + '"></div>'
+      + '<span style="font-size:12px;color:' + st.color + ';font-weight:500">' + st.text + '</span>'
+      + '</div></div>'
+      + (fq > 0 ? '<div style="font-size:20px;font-weight:700;color:var(--c-cupping)">' + fq + '</div>' : '<div style="font-size:14px;color:var(--border)">—</div>')
+      + '<div style="color:var(--text3);font-size:16px">\u203a</div>'
+      + '</div>';
+  }).join('');
+  document.getElementById('cupPickerList').innerHTML = html;
+}
+
+function openCupDetail(i) {
+  /* Auto-save notes from any previously open cup */
+  document.getElementById('cupPickerView').style.display = 'none';
+  document.getElementById('cupDetailView').style.display = '';
+  window._cupActiveIdx = i;
+
+  var e = cupEntries[i];
+  var bean = beans.find(function(b) { return b.id === e.beanId; });
+  var name = bean ? bdn(bean) : 'Unknown';
+
+  /* Header */
+  document.getElementById('cupDetailHeader').innerHTML =
+    '<div style="padding:16px 16px 0;display:flex;align-items:center;gap:12px">'
+    + '<div style="width:40px;height:40px;border-radius:10px;background:var(--bg);display:flex;align-items:center;justify-content:center;flex-shrink:0">'
+    + '<span style="font-size:16px;font-weight:700;color:var(--c-cupping)">' + (i + 1) + '</span></div>'
+    + '<div><div style="font-size:17px;font-weight:700;color:var(--text)">' + name + '</div>'
+    + (e.note ? '<div style="font-size:13px;color:var(--text3)">' + e.note + '</div>' : '')
+    + '</div></div>';
+
+  /* Build form */
+  var html = '';
+  var n = window._cupNotes[i];
+
+  /* Aroma */
+  html += _cupSectionLabel('Aroma', 'var(--aroma)');
+  html += _cupCard(
+    '<div style="padding:14px 16px;border-bottom:1px solid rgba(0,0,0,.04)">'
+    + '<div style="font-size:12px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Dry</div>'
+    + _cupNotesRow(i, 'dryAroma')
+    + '</div>'
+    + '<div style="padding:14px 16px">'
+    + '<div style="font-size:12px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Wet</div>'
+    + _cupNotesRow(i, 'wetAroma')
+    + '</div>'
+  );
+
+  /* Hot */
+  html += _cupSectionLabel('Hot', 'var(--hot)');
+  html += _cupCard('<div style="padding:4px 16px 8px">'
+    + _cupScoreRow(i, 'hot', 'acidity', 'Acidity')
+    + _cupScoreRow(i, 'hot', 'sweetness', 'Sweetness')
+    + _cupScoreRow(i, 'hot', 'bitterness', 'Bitterness')
+    + _cupScoreRow(i, 'hot', 'body', 'Body')
+    + '</div>'
+  );
+
+  /* Cool */
+  html += _cupSectionLabel('Cool', 'var(--cool)');
+  html += _cupCard('<div style="padding:4px 16px 8px">'
+    + _cupScoreRow(i, 'cool', 'acidity', 'Acidity')
+    + _cupScoreRow(i, 'cool', 'sweetness', 'Sweetness')
+    + _cupScoreRow(i, 'cool', 'bitterness', 'Bitterness')
+    + _cupScoreRow(i, 'cool', 'body', 'Body')
+    + '</div>'
+  );
+
+  /* Flavour Quality */
+  html += _cupSectionLabel('Flavour Quality', 'var(--c-cupping)');
+  html += _cupCard(
+    '<div style="padding:16px;display:flex;align-items:center;justify-content:space-between">'
+    + '<div style="font-size:15px;font-weight:600;color:var(--text)">Score</div>'
+    + '<div style="display:flex;align-items:center;gap:12px">'
+    + '<button onclick="cupAdjFQ(' + i + ',-0.5)" style="width:36px;height:36px;border-radius:50%;border:none;background:var(--bg);font-size:18px;cursor:pointer;color:var(--text);font-weight:500">\u2212</button>'
+    + '<div style="min-width:48px;text-align:center"><span id="cupFQ' + i + '" style="font-size:28px;font-weight:700;color:var(--c-cupping)">' + window._cupScores[i].fq + '</span><span style="font-size:14px;color:var(--text3);font-weight:500"> /10</span></div>'
+    + '<button onclick="cupAdjFQ(' + i + ',0.5)" style="width:36px;height:36px;border-radius:50%;border:none;background:var(--bg);font-size:18px;cursor:pointer;color:var(--text);font-weight:500">+</button>'
+    + '</div></div>'
+  );
+
+  /* Notes */
+  html += _cupSectionLabel('Notes');
+  html += _cupCard(
+    '<div style="padding:14px 16px;border-bottom:1px solid rgba(0,0,0,.04)">'
+    + '<div style="font-size:12px;font-weight:600;color:#4A7C59;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">What I Like</div>'
+    + _cupNotesRow(i, 'like')
+    + '</div>'
+    + '<div style="padding:14px 16px;border-bottom:1px solid rgba(0,0,0,.04)">'
+    + '<div style="font-size:12px;font-weight:600;color:#C1666B;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">What I Don\'t Like</div>'
+    + _cupNotesRow(i, 'dislike')
+    + '</div>'
+    + '<div style="padding:14px 16px">'
+    + '<div style="font-size:12px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Additional</div>'
+    + _cupNotesRow(i, 'extra')
+    + '</div>'
+  );
+
+  document.getElementById('cupDetailForm').innerHTML = html;
+
+  /* Restore saved notes into textareas */
+  ['dryAroma','wetAroma','like','dislike','extra'].forEach(function(k) {
+    var el = document.getElementById('cupN' + i + '_' + k);
+    if (el && n[k]) el.value = n[k];
+  });
+
+  /* Restore score button highlights */
+  var sc = window._cupScores[i];
+  ['hot','cool'].forEach(function(section) {
+    ['acidity','sweetness','bitterness','body'].forEach(function(key) {
+      var val = sc[section][key];
+      if (val != null) {
+        for (var nn = 0; nn <= 9; nn++) {
+          var btn = document.getElementById('cup' + i + '_' + section + '_' + key + '_' + nn);
+          if (btn) {
+            btn.style.background = (nn === val) ? (section === 'hot' ? 'var(--hot)' : 'var(--cool)') : 'var(--bg)';
+            btn.style.color = (nn === val) ? '#fff' : 'var(--text3)';
+            btn.style.borderColor = (nn === val) ? 'transparent' : '';
+          }
+        }
+      }
+    });
+  });
+
+  /* Scroll to top */
+  document.getElementById('content').scrollTo(0, 0);
+}
+
+function _autosaveNotes() {
+  var i = window._cupActiveIdx;
+  if (i == null || !window._cupNotes || !window._cupNotes[i]) return;
+  ['dryAroma','wetAroma','like','dislike','extra'].forEach(function(k) {
+    var el = document.getElementById('cupN' + i + '_' + k);
+    if (el) window._cupNotes[i][k] = el.value;
+  });
+}
+
+function cupBackToList() {
+  _autosaveNotes();
+  window._cupActiveIdx = null;
+  renderCupPicker();
+  document.getElementById('content').scrollTo(0, 0);
 }
 
 function cupSetScore(cupIdx, section, key, val) {
@@ -3043,20 +3155,26 @@ function cancelCupping() {
   document.getElementById('cupSetup').style.display = '';
   document.getElementById('cupScoring').style.display = 'none';
   window._cupScores = null;
+  window._cupNotes = [];
+  window._cupActiveIdx = null;
 }
 
 function _getCupNotes(i) {
+  /* If currently viewing this cup, grab live values */
+  if (window._cupActiveIdx === i) _autosaveNotes();
+  var n = window._cupNotes && window._cupNotes[i] ? window._cupNotes[i] : {};
   return {
-    dryAroma: (document.getElementById('cupN' + i + '_dryAroma') || {}).value || '',
-    wetAroma: (document.getElementById('cupN' + i + '_wetAroma') || {}).value || '',
-    like:     (document.getElementById('cupN' + i + '_like') || {}).value || '',
-    dislike:  (document.getElementById('cupN' + i + '_dislike') || {}).value || '',
-    extra:    (document.getElementById('cupN' + i + '_extra') || {}).value || ''
+    dryAroma: n.dryAroma || '',
+    wetAroma: n.wetAroma || '',
+    like:     n.like || '',
+    dislike:  n.dislike || '',
+    extra:    n.extra || ''
   };
 }
 
 function saveCupSession() {
   if (!window._cupScores) return;
+  _autosaveNotes();
   const sessionName = (document.getElementById('cupSessionName') || {}).value || '';
   const session = {
     id: uid(),
@@ -3085,6 +3203,8 @@ function saveCupSession() {
   cupEntries = [];
   cupSelectedBeans.clear();
   window._cupScores = null;
+  window._cupNotes = [];
+  window._cupActiveIdx = null;
   document.getElementById('cupSetup').style.display = '';
   document.getElementById('cupScoring').style.display = 'none';
   if (document.getElementById('cupSessionName')) document.getElementById('cupSessionName').value = '';
