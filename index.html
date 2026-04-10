@@ -2341,6 +2341,13 @@ function renderDataset() {
       return bean && bean[_dsFilter.key] === _dsFilter.val;
     });
   }
+  /* Sort by date descending (newest first), then by id for same-date stability */
+  filtered = filtered.slice().sort(function(a, b) {
+    if (a.date && b.date) { const d = b.date.localeCompare(a.date); if (d !== 0) return d; }
+    else if (a.date) return -1;
+    else if (b.date) return 1;
+    return (b.id || '').localeCompare(a.id || '');
+  });
   if (!filtered.length) {
     el.innerHTML = q
       ? '<div class="empty"><div class="empty-icon">🔍</div><div class="empty-title">No matches</div><div class="empty-sub">Try a different search term</div></div>'
@@ -2352,7 +2359,9 @@ function renderDataset() {
     const name  = bean ? bdn(bean) : (brew.name || 'Unnamed brew');
     const ratio = (brew.dose && brew.water) ? '1:' + (brew.water / brew.dose).toFixed(1) : '—';
     const temp  = brew.temp ? brew.temp + '°' : '—';
-    const equip = [brew.brewer, brew.grinder].filter(Boolean).map(esc).join(' · ') || 'No equipment';
+    const equip = [brew.brewer, brew.grinder].filter(Boolean).map(esc).join(' \u00b7 ') || 'No equipment';
+    const dd = brew.date ? brew.date.split('-') : [];
+    const fmtDate = dd.length === 3 ? dd[2] + '/' + dd[1] + '/' + dd[0] : '';
     return `
     <div class="brew-wrap" id="wrap-${brew.id}">
       <div class="brew-del-bg" onclick="askDelete('${brew.id}')">Delete</div>
@@ -2362,7 +2371,7 @@ function renderDataset() {
         oncontextmenu="openCtx(event,'${brew.id}')">
         <div class="cmp-check${_cmpSel.has(brew.id)?' checked':''}" id="cmpChk-${brew.id}"></div>
         <div class="brew-bean">${esc(name)}${ageHtml(beanAge(bean, brew.date), 'brew-age-tag')}</div>
-        <div class="brew-sub">${equip}</div>
+        <div class="brew-sub">${equip}${fmtDate ? ' \u00b7 ' + fmtDate : ''}</div>
         <div class="brew-stats">
           <div class="brew-stat"><span class="brew-stat-label">Grind</span><span class="brew-stat-val">${esc(brew.grind||'—')}</span></div>
           <div class="brew-stat"><span class="brew-stat-label">Ratio</span><span class="brew-stat-val">${ratio}</span></div>
