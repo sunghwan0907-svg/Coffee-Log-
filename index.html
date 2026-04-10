@@ -4422,6 +4422,29 @@ function exportXLSX() {
   }
 
 
+  /* ── Cupping tab ── */
+  if (cupSessions.length) {
+    const cupRows = [['Session','Date','Cup #','Bean','Note','Hot Acidity','Hot Sweetness','Hot Bitterness','Hot Body','Cool Acidity','Cool Sweetness','Cool Bitterness','Cool Body','Flavour Quality','Dry Aroma','Wet Aroma','What I Like','What I Don\'t Like','Additional Notes']];
+    cupSessions.forEach(function(s) {
+      const dd = s.date ? s.date.split('-') : [];
+      const fmtD = dd.length === 3 ? dd[2] + '/' + dd[1] + '/' + dd[0] : s.date || '';
+      (s.cups || []).forEach(function(c, ci) {
+        const bean = beans.find(function(b) { return b.id === c.beanId; });
+        const bName = bean ? bdn(bean) : 'Unknown';
+        cupRows.push([
+          s.name || '', fmtD, ci + 1, bName, c.note || '',
+          c.hot ? c.hot.acidity : '', c.hot ? c.hot.sweetness : '', c.hot ? c.hot.bitterness : '', c.hot ? c.hot.body : '',
+          c.cool ? c.cool.acidity : '', c.cool ? c.cool.sweetness : '', c.cool ? c.cool.bitterness : '', c.cool ? c.cool.body : '',
+          c.fq != null ? c.fq : '',
+          c.dryAroma || '', c.wetAroma || '', c.like || '', c.dislike || '', c.extra || ''
+        ]);
+      });
+    });
+    const wsCup = XLSX.utils.aoa_to_sheet(cupRows);
+    wsCup['!cols'] = cupRows[0].map(function(h) { return { wch: Math.max(h.length + 2, 12) }; });
+    XLSX.utils.book_append_sheet(wb, wsCup, 'Cupping');
+  }
+
   XLSX.writeFile(wb, 'Brew-Log-' + today() + '.xlsx');
   showToast('Exported!');
 }
@@ -4914,7 +4937,7 @@ async function copyAllData() {
     const data = _strip({
       b: brews.map(_shrinkBrew),
       n: beans.map(_shrinkBean),
-      e: settings, ts: Date.now(), v: 3
+      e: settings, c: cupSessions, ts: Date.now(), v: 3
     });
     const json = JSON.stringify(data);
     const compressed = await _compress(json);
@@ -4923,14 +4946,14 @@ async function copyAllData() {
     const count = brews.length + beans.length;
     const kb = Math.round(encoded.length / 1024);
     showToast('Copied! ' + count + ' items (' + kb + 'KB)');
-    syncLog(brews.length + ' brews + ' + beans.length + ' beans copied to clipboard');
+    syncLog(brews.length + ' brews + ' + beans.length + ' beans + ' + cupSessions.length + ' cupping sessions copied');
   } catch(e) {
     /* fallback: select a temporary textarea */
     try {
       const data = _strip({
         b: brews.map(_shrinkBrew),
         n: beans.map(_shrinkBean),
-        e: settings, ts: Date.now(), v: 3
+        e: settings, c: cupSessions, ts: Date.now(), v: 3
       });
       const json = JSON.stringify(data);
       const compressed = await _compress(json);
@@ -5003,6 +5026,13 @@ async function pasteAllData() {
       });
       persist(K_SETTINGS, settings);
       renderEquipLists();
+    }
+    /* Cupping sessions */
+    const srcCup = isV3 ? (data.c || []) : [];
+    if (srcCup.length) {
+      const localIds = new Set(cupSessions.map(s => s.id));
+      srcCup.forEach(s => { if (!localIds.has(s.id)) { cupSessions.push(s); added++; } });
+      persist(K_CUPPING, cupSessions);
     }
     renderBeans();
     renderDataset();
