@@ -1336,6 +1336,10 @@ body {
       </div>
       <div class="section">
         <div class="section-header">Past Sessions</div>
+        <div class="ds-search-wrap">
+          <input type="text" id="cupSearch" class="ds-search" placeholder="Search sessions..." oninput="renderCupHistory()">
+        </div>
+        <div style="display:flex;gap:6px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding:0 16px 8px" id="cupFilterBar"></div>
         <div id="cupHistory"></div>
       </div>
     </div>
@@ -2881,20 +2885,20 @@ function removeCupEntry(i) {
 
 function _cupScoreRow(cupIdx, section, key, label) {
   const id = 'cup' + cupIdx + '_' + section + '_' + key;
-  return '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0">'
-    + '<span style="font-size:13px;color:var(--text)">' + label + '</span>'
-    + '<div style="display:flex;gap:4px">'
+  return '<div style="padding:6px 0">'
+    + '<div style="font-size:13px;color:var(--text);margin-bottom:6px">' + label + '</div>'
+    + '<div style="display:grid;grid-template-columns:repeat(10,1fr);gap:4px">'
     + [0,1,2,3,4,5,6,7,8,9].map(function(n) {
       return '<button onclick="cupSetScore(' + cupIdx + ',\'' + section + '\',\'' + key + '\',' + n + ')" '
         + 'id="' + id + '_' + n + '" '
-        + 'style="width:28px;height:28px;border-radius:6px;border:1.5px solid var(--border);background:var(--bg);font-size:12px;cursor:pointer;color:var(--text);font-weight:600">' + n + '</button>';
+        + 'style="height:32px;border-radius:6px;border:1.5px solid var(--border);background:var(--bg);font-size:13px;cursor:pointer;color:var(--text);font-weight:600">' + n + '</button>';
     }).join('')
     + '</div></div>';
 }
 
-function _cupNotesRow(cupIdx, key, placeholder) {
-  return '<textarea id="cupN' + cupIdx + '_' + key + '" placeholder="' + placeholder + '" '
-    + 'style="width:100%;min-height:50px;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-size:13px;background:var(--bg);color:var(--text);font-family:inherit;resize:vertical;margin:4px 0 8px"></textarea>';
+function _cupNotesRow(cupIdx, key) {
+  return '<textarea id="cupN' + cupIdx + '_' + key + '" '
+    + 'style="width:100%;min-height:50px;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);font-size:13px;background:var(--bg);color:var(--text);font-family:inherit;resize:vertical;margin:4px 0 8px;box-sizing:border-box"></textarea>';
 }
 
 function startCupping() {
@@ -2912,9 +2916,9 @@ function startCupping() {
       + '<div style="font-size:13px;color:var(--text3);margin-bottom:10px">' + noteStr + '</div>'
       /* Dry & Wet Aroma */
       + '<div style="' + secStyle + 'var(--aroma)">Dry Aroma</div>'
-      + _cupNotesRow(i, 'dryAroma', 'Dry aroma notes...')
+      + _cupNotesRow(i, 'dryAroma')
       + '<div style="' + secStyle + 'var(--aroma)">Wet Aroma</div>'
-      + _cupNotesRow(i, 'wetAroma', 'Wet aroma notes...')
+      + _cupNotesRow(i, 'wetAroma')
       /* Hot */
       + '<div style="' + secStyle + 'var(--hot)">Hot</div>'
       + _cupScoreRow(i, 'hot', 'acidity', 'Acidity')
@@ -2939,11 +2943,11 @@ function startCupping() {
       + '<div style="font-size:11px;color:var(--text3);text-align:right">/ 10</div>'
       /* Notes sections */
       + '<div style="' + secStyle + '#4A7C59">What I Like</div>'
-      + _cupNotesRow(i, 'like', 'What stood out positively...')
+      + _cupNotesRow(i, 'like')
       + '<div style="' + secStyle + '#C1666B">What I Don\'t Like</div>'
-      + _cupNotesRow(i, 'dislike', 'What could be better...')
+      + _cupNotesRow(i, 'dislike')
       + '<div style="' + secStyle + 'var(--text2)">Additional Notes</div>'
-      + _cupNotesRow(i, 'extra', 'Any other observations...')
+      + _cupNotesRow(i, 'extra')
       + '</div>';
   }).join('');
   // Init score state
@@ -3031,27 +3035,72 @@ function saveCupSession() {
   renderCupping();
 }
 
+let _cupFilter = '';
+
+function _cupBeanNames(s) {
+  const names = [];
+  if (s.cups) {
+    const seen = {};
+    s.cups.forEach(function(c) {
+      if (!seen[c.beanId]) {
+        seen[c.beanId] = true;
+        const bean = beans.find(function(b) { return b.id === c.beanId; });
+        names.push(bean ? bdn(bean) : 'Unknown');
+      }
+    });
+  }
+  return names;
+}
+
+function renderCupFilterBar() {
+  const bar = document.getElementById('cupFilterBar');
+  if (!bar) return;
+  /* Collect all bean names used in cupping sessions */
+  const beanSet = {};
+  cupSessions.forEach(function(s) {
+    (s.cups || []).forEach(function(c) {
+      if (!beanSet[c.beanId]) {
+        const bean = beans.find(function(b) { return b.id === c.beanId; });
+        beanSet[c.beanId] = bean ? bdn(bean) : 'Unknown';
+      }
+    });
+  });
+  const ids = Object.keys(beanSet);
+  if (ids.length < 2) { bar.innerHTML = ''; return; }
+  if (_cupFilter) {
+    bar.innerHTML = '<button style="flex-shrink:0;padding:6px 14px;border-radius:20px;font-size:13px;font-weight:600;border:none;cursor:pointer;font-family:inherit;background:var(--c-cupping);color:#fff" onclick="clearCupFilter()">\u2715 ' + esc(beanSet[_cupFilter] || _cupFilter) + '</button>';
+  } else {
+    bar.innerHTML = ids.map(function(id) {
+      return '<button onclick="setCupFilter(\'' + id + '\')" style="flex-shrink:0;padding:6px 14px;border-radius:20px;font-size:13px;font-weight:500;border:1.5px solid var(--border);background:var(--card);cursor:pointer;font-family:inherit;color:var(--text2)">' + esc(beanSet[id]) + '</button>';
+    }).join('');
+  }
+}
+function setCupFilter(id) { _cupFilter = id; renderCupFilterBar(); renderCupHistory(); }
+function clearCupFilter() { _cupFilter = ''; renderCupFilterBar(); renderCupHistory(); }
+
 function renderCupHistory() {
+  renderCupFilterBar();
   const el = document.getElementById('cupHistory');
-  if (!cupSessions.length) {
-    el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text3);font-size:14px">No sessions yet</div>';
+  const q = ((document.getElementById('cupSearch') || {}).value || '').trim().toLowerCase();
+  let list = cupSessions;
+  if (_cupFilter) {
+    list = list.filter(function(s) { return (s.cups || []).some(function(c) { return c.beanId === _cupFilter; }); });
+  }
+  if (q) {
+    list = list.filter(function(s) {
+      const names = _cupBeanNames(s).join(' ').toLowerCase();
+      return (s.name || '').toLowerCase().indexOf(q) >= 0 || names.indexOf(q) >= 0;
+    });
+  }
+  if (!list.length) {
+    el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text3);font-size:14px">' + (cupSessions.length ? 'No matching sessions' : 'No sessions yet') + '</div>';
     return;
   }
-  el.innerHTML = cupSessions.map(function(s) {
+  el.innerHTML = list.map(function(s) {
     const dd = s.date ? s.date.split('-') : [];
     const fmtD = dd.length === 3 ? (dd[2] + '-' + dd[1] + '-' + dd[0]) : s.date;
     const cupCount = s.cups ? s.cups.length : 0;
-    const beanNames = [];
-    if (s.cups) {
-      const seen = {};
-      s.cups.forEach(function(c) {
-        if (!seen[c.beanId]) {
-          seen[c.beanId] = true;
-          const bean = beans.find(function(b) { return b.id === c.beanId; });
-          beanNames.push(bean ? bdn(bean) : 'Unknown');
-        }
-      });
-    }
+    const beanNames = _cupBeanNames(s);
     const title = s.name || fmtD;
     return '<div onclick="viewCupSession(\'' + s.id + '\')" style="padding:14px 16px;border-bottom:1px solid var(--border);cursor:pointer">'
       + '<div style="display:flex;justify-content:space-between;align-items:center">'
