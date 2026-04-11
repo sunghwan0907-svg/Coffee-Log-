@@ -3023,11 +3023,11 @@ function openCupDetail(i) {
 
 /* Section button data */
 var CUP_SECTIONS = [
-  { key: 'aroma',   label: 'Aroma',   icon: '\uD83D\uDCA8', color: 'var(--aroma,#8B6F47)' },
-  { key: 'hot',     label: 'Hot',      icon: '\uD83D\uDD25', color: 'var(--hot,#C1666B)' },
-  { key: 'cool',    label: 'Cool',     icon: '\u2744\uFE0F',  color: 'var(--cool,#4A90D9)' },
-  { key: 'fq',      label: 'FQ',       icon: '\u2B50',        color: 'var(--c-cupping)' },
-  { key: 'notes',   label: 'Notes',    icon: '\uD83D\uDCDD', color: 'var(--text2,#666)' }
+  { key: 'aroma',   label: 'Aroma',   bg: '#F5EDE3', color: '#8B6F47' },
+  { key: 'hot',     label: 'Hot',      bg: '#FDEAE8', color: '#C1666B' },
+  { key: 'cool',    label: 'Cool',     bg: '#E4EFF9', color: '#4A90D9' },
+  { key: 'fq',      label: 'FQ',       bg: '#FFF5E0', color: '#B8860B' },
+  { key: 'notes',   label: 'Notes',    bg: '#EDEDED', color: '#666' }
 ];
 
 function _cupSectionStatus(i, key) {
@@ -3054,12 +3054,11 @@ function _renderCupSections(i) {
     var status = _cupSectionStatus(i, s.key);
     var dotColor = status === 'done' ? '#4A7C59' : status === 'partial' ? '#E8A317' : 'transparent';
     html += '<button onclick="cupToggleSection(\'' + s.key + '\')" style="'
-      + 'display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 4px;'
-      + 'border-radius:12px;border:2px solid ' + (active ? s.color : 'var(--border)') + ';'
-      + 'background:' + (active ? s.color : 'var(--card)') + ';cursor:pointer;position:relative'
+      + 'display:flex;align-items:center;justify-content:center;padding:12px 4px;'
+      + 'border-radius:12px;border:2px solid ' + (active ? s.color : 'transparent') + ';'
+      + 'background:' + (active ? s.color : s.bg) + ';cursor:pointer;position:relative'
       + '">'
-      + '<span style="font-size:20px;' + (active ? 'filter:brightness(10)' : '') + '">' + s.icon + '</span>'
-      + '<span style="font-size:11px;font-weight:600;color:' + (active ? '#fff' : 'var(--text2)') + '">' + s.label + '</span>'
+      + '<span style="font-size:12px;font-weight:700;color:' + (active ? '#fff' : s.color) + ';letter-spacing:.3px">' + s.label + '</span>'
       + (status ? '<div style="position:absolute;top:4px;right:4px;width:7px;height:7px;border-radius:50%;background:' + (active ? '#fff' : dotColor) + '"></div>' : '')
       + '</button>';
   });
