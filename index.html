@@ -3384,7 +3384,20 @@ function _viewScoreCard(label, color, scores) {
     + '</div></div>';
 }
 
+/* Track which cup is expanded in the saved session view */
+window._viewCupOpen = null;
+window._viewCupSection = null;
+window._viewSessionId = null;
+
 function viewCupSession(id) {
+  window._viewSessionId = id;
+  window._viewCupOpen = null;
+  window._viewCupSection = null;
+  _renderCupSessionView();
+}
+
+function _renderCupSessionView() {
+  var id = window._viewSessionId;
   const s = cupSessions.find(function(x) { return x.id === id; });
   if (!s) return;
   const dd = s.date ? s.date.split('-') : [];
@@ -3399,79 +3412,160 @@ function viewCupSession(id) {
     + '<button onclick="closeCupView()" style="border:none;background:var(--bg);width:32px;height:32px;border-radius:50%;font-size:18px;color:var(--text3);cursor:pointer;flex-shrink:0">\u00d7</button>'
     + '</div>';
 
+  /* Cup list */
   (s.cups || []).forEach(function(c, i) {
     const bean = beans.find(function(b) { return b.id === c.beanId; });
     const name = bean ? bdn(bean) : 'Unknown';
     var fq = c.fq != null ? c.fq : (c.total != null ? c.total : null);
+    var isOpen = window._viewCupOpen === i;
 
-    /* Cup card header */
-    html += '<div style="background:var(--bg);border-radius:14px;padding:16px;margin-bottom:14px">';
-    html += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">'
-      + '<div style="width:36px;height:36px;border-radius:10px;background:var(--card);display:flex;align-items:center;justify-content:center;flex-shrink:0">'
+    /* Cup row button */
+    html += '<div style="background:var(--card);border-radius:14px;margin-bottom:10px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.04)">';
+    html += '<button onclick="viewToggleCup(' + i + ')" style="width:100%;padding:14px 16px;border:none;background:none;cursor:pointer;display:flex;align-items:center;gap:12px;text-align:left">'
+      + '<div style="width:36px;height:36px;border-radius:10px;background:var(--bg);display:flex;align-items:center;justify-content:center;flex-shrink:0">'
       + '<span style="font-size:15px;font-weight:700;color:var(--c-cupping)">' + (i + 1) + '</span></div>'
       + '<div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:700;color:var(--text)">' + name + '</div>'
       + (c.note ? '<div style="font-size:12px;color:var(--text3)">' + c.note + '</div>' : '')
       + '</div>'
-      + (fq != null ? '<div style="font-size:22px;font-weight:700;color:var(--c-cupping)">' + fq + '<span style="font-size:12px;color:var(--text3);font-weight:500">/10</span></div>' : '')
-      + '</div>';
+      + (fq != null ? '<div style="font-size:20px;font-weight:700;color:var(--c-cupping)">' + fq + '<span style="font-size:11px;color:var(--text3);font-weight:500">/10</span></div>' : '')
+      + '<div style="color:var(--text3);font-size:16px;margin-left:4px">' + (isOpen ? '\u2039' : '\u203a') + '</div>'
+      + '</button>';
 
-    /* Aroma */
-    if (c.dryAroma || c.wetAroma) {
-      html += '<div style="background:var(--card);border-radius:14px;margin-bottom:10px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.04)">';
-      if (c.dryAroma) {
-        html += '<div style="padding:12px 16px' + (c.wetAroma ? ';border-bottom:1px solid rgba(0,0,0,.04)' : '') + '">'
-          + '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--aroma);margin-bottom:4px">Dry Aroma</div>'
-          + '<div style="font-size:14px;color:var(--text);line-height:1.4">' + c.dryAroma + '</div></div>';
-      }
-      if (c.wetAroma) {
-        html += '<div style="padding:12px 16px">'
-          + '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--aroma);margin-bottom:4px">Wet Aroma</div>'
-          + '<div style="font-size:14px;color:var(--text);line-height:1.4">' + c.wetAroma + '</div></div>';
-      }
+    /* Expanded cup detail */
+    if (isOpen) {
+      html += '<div style="padding:0 12px 14px">';
+
+      /* Section buttons */
+      var VIEW_SECS = [
+        { key: 'aroma', label: 'Aroma', bg: '#F5EDE3', color: '#8B6F47', has: !!(c.dryAroma || c.wetAroma) },
+        { key: 'hot', label: 'Hot', bg: '#FDEAE8', color: '#C1666B', has: !!(c.hot && (c.hot.acidity != null || c.hot.sweetness != null || c.hot.bitterness != null || c.hot.body != null)) },
+        { key: 'cool', label: 'Cool', bg: '#E4EFF9', color: '#4A90D9', has: !!(c.cool && (c.cool.acidity != null || c.cool.sweetness != null || c.cool.bitterness != null || c.cool.body != null)) },
+        { key: 'fq', label: 'FQ', bg: '#FFF5E0', color: '#B8860B', has: fq != null && fq > 0 },
+        { key: 'notes', label: 'Notes', bg: '#EDEDED', color: '#666', has: !!(c.like || c.dislike || c.extra) }
+      ];
+      html += '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:10px">';
+      VIEW_SECS.forEach(function(vs) {
+        var active = window._viewCupSection === vs.key;
+        html += '<button onclick="viewToggleSection(\'' + vs.key + '\')" style="'
+          + 'display:flex;align-items:center;justify-content:center;padding:10px 4px;'
+          + 'border-radius:10px;border:2px solid ' + (active ? vs.color : 'transparent') + ';'
+          + 'background:' + (active ? vs.color : vs.bg) + ';cursor:pointer;position:relative'
+          + '">'
+          + '<span style="font-size:11px;font-weight:700;color:' + (active ? '#fff' : vs.color) + ';letter-spacing:.3px">' + vs.label + '</span>'
+          + (vs.has ? '<div style="position:absolute;top:3px;right:3px;width:6px;height:6px;border-radius:50%;background:' + (active ? '#fff' : '#4A7C59') + '"></div>' : '')
+          + '</button>';
+      });
       html += '</div>';
-    }
 
-    /* Hot / Cool score cards */
-    html += _viewScoreCard('Hot', 'var(--hot)', c.hot);
-    html += _viewScoreCard('Cool', 'var(--cool)', c.cool);
+      /* Section content */
+      if (window._viewCupSection) {
+        html += _viewSectionContent(c, window._viewCupSection);
+      }
 
-    /* Notes */
-    if (c.like || c.dislike || c.extra) {
-      html += '<div style="background:var(--card);border-radius:14px;margin-bottom:10px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.04)">';
-      if (c.like) {
-        html += '<div style="padding:12px 16px;border-bottom:1px solid rgba(0,0,0,.04)">'
-          + '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#4A7C59;margin-bottom:4px">What I Like</div>'
-          + '<div style="font-size:14px;color:var(--text);line-height:1.4">' + c.like + '</div></div>';
-      }
-      if (c.dislike) {
-        html += '<div style="padding:12px 16px;border-bottom:1px solid rgba(0,0,0,.04)">'
-          + '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#C1666B;margin-bottom:4px">What I Don\'t Like</div>'
-          + '<div style="font-size:14px;color:var(--text);line-height:1.4">' + c.dislike + '</div></div>';
-      }
-      if (c.extra) {
-        html += '<div style="padding:12px 16px">'
-          + '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text3);margin-bottom:4px">Additional</div>'
-          + '<div style="font-size:14px;color:var(--text);line-height:1.4">' + c.extra + '</div></div>';
-      }
       html += '</div>';
-    }
-
-    /* Legacy SCA */
-    if (c.scores && c.total != null) {
-      html += '<div style="text-align:center;font-size:14px;color:var(--c-cupping);font-weight:600;margin-bottom:8px">SCA Total: ' + c.total + '</div>';
     }
 
     html += '</div>'; /* close cup card */
   });
 
-  html += '<button onclick="deleteCupSession(\'' + s.id + '\')" style="width:100%;padding:12px;border-radius:12px;border:1.5px solid #C1666B;background:none;color:#C1666B;font-size:14px;cursor:pointer;margin-top:4px">Delete Session</button>';
-  html += '</div>'; /* close max-width wrapper */
+  /* Legacy SCA */
+  (s.cups || []).forEach(function(c) {
+    if (c.scores && c.total != null) {
+      html += '<div style="text-align:center;font-size:14px;color:var(--c-cupping);font-weight:600;margin-bottom:8px">SCA Total: ' + c.total + '</div>';
+    }
+  });
 
-  const overlay = document.createElement('div');
-  overlay.id = 'cupViewOverlay';
-  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg);z-index:200;overflow-y:auto';
-  overlay.innerHTML = html;
-  document.body.appendChild(overlay);
+  html += '<button onclick="deleteCupSession(\'' + s.id + '\')" style="width:100%;padding:12px;border-radius:12px;border:1.5px solid #C1666B;background:none;color:#C1666B;font-size:14px;cursor:pointer;margin-top:4px">Delete Session</button>';
+  html += '</div>';
+
+  var existing = document.getElementById('cupViewOverlay');
+  if (existing) {
+    existing.innerHTML = html;
+  } else {
+    const overlay = document.createElement('div');
+    overlay.id = 'cupViewOverlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg);z-index:200;overflow-y:auto';
+    overlay.innerHTML = html;
+    document.body.appendChild(overlay);
+  }
+}
+
+function viewToggleCup(i) {
+  if (window._viewCupOpen === i) {
+    window._viewCupOpen = null;
+    window._viewCupSection = null;
+  } else {
+    window._viewCupOpen = i;
+    window._viewCupSection = null;
+  }
+  _renderCupSessionView();
+}
+
+function viewToggleSection(key) {
+  window._viewCupSection = (window._viewCupSection === key) ? null : key;
+  _renderCupSessionView();
+}
+
+function _viewSectionContent(c, key) {
+  var h = '';
+  if (key === 'aroma') {
+    if (!c.dryAroma && !c.wetAroma) return '<div style="padding:8px 4px;font-size:13px;color:var(--text3)">No aroma notes</div>';
+    h += '<div style="background:var(--bg);border-radius:12px;overflow:hidden">';
+    if (c.dryAroma) {
+      h += '<div style="padding:10px 14px' + (c.wetAroma ? ';border-bottom:1px solid rgba(0,0,0,.04)' : '') + '">'
+        + '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#8B6F47;margin-bottom:4px">Dry Aroma</div>'
+        + '<div style="font-size:14px;color:var(--text);line-height:1.4">' + c.dryAroma + '</div></div>';
+    }
+    if (c.wetAroma) {
+      h += '<div style="padding:10px 14px">'
+        + '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#8B6F47;margin-bottom:4px">Wet Aroma</div>'
+        + '<div style="font-size:14px;color:var(--text);line-height:1.4">' + c.wetAroma + '</div></div>';
+    }
+    h += '</div>';
+  }
+  if (key === 'hot' || key === 'cool') {
+    var scores = c[key];
+    if (!scores || (scores.acidity == null && scores.sweetness == null && scores.bitterness == null && scores.body == null)) {
+      return '<div style="padding:8px 4px;font-size:13px;color:var(--text3)">No ' + key + ' scores</div>';
+    }
+    h += '<div style="background:var(--bg);border-radius:12px;overflow:hidden">';
+    ['acidity','sweetness','bitterness','body'].forEach(function(attr) {
+      if (scores[attr] != null) {
+        h += '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid rgba(0,0,0,.04)">'
+          + '<span style="font-size:14px;color:var(--text);text-transform:capitalize">' + attr + '</span>'
+          + '<span style="font-size:16px;font-weight:700;color:' + (key === 'hot' ? '#C1666B' : '#4A90D9') + '">' + scores[attr] + '</span></div>';
+      }
+    });
+    h += '</div>';
+  }
+  if (key === 'fq') {
+    var fq = c.fq != null ? c.fq : (c.total != null ? c.total : null);
+    if (fq == null || fq === 0) return '<div style="padding:8px 4px;font-size:13px;color:var(--text3)">No FQ score</div>';
+    h += '<div style="background:var(--bg);border-radius:12px;padding:20px;text-align:center">'
+      + '<div style="font-size:36px;font-weight:700;color:var(--c-cupping)">' + fq + '<span style="font-size:16px;color:var(--text3);font-weight:500"> /10</span></div>'
+      + '</div>';
+  }
+  if (key === 'notes') {
+    if (!c.like && !c.dislike && !c.extra) return '<div style="padding:8px 4px;font-size:13px;color:var(--text3)">No notes</div>';
+    h += '<div style="background:var(--bg);border-radius:12px;overflow:hidden">';
+    if (c.like) {
+      h += '<div style="padding:10px 14px;border-bottom:1px solid rgba(0,0,0,.04)">'
+        + '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#4A7C59;margin-bottom:4px">What I Like</div>'
+        + '<div style="font-size:14px;color:var(--text);line-height:1.4">' + c.like + '</div></div>';
+    }
+    if (c.dislike) {
+      h += '<div style="padding:10px 14px;border-bottom:1px solid rgba(0,0,0,.04)">'
+        + '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#C1666B;margin-bottom:4px">What I Don\'t Like</div>'
+        + '<div style="font-size:14px;color:var(--text);line-height:1.4">' + c.dislike + '</div></div>';
+    }
+    if (c.extra) {
+      h += '<div style="padding:10px 14px">'
+        + '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text3);margin-bottom:4px">Additional</div>'
+        + '<div style="font-size:14px;color:var(--text);line-height:1.4">' + c.extra + '</div></div>';
+    }
+    h += '</div>';
+  }
+  return h;
 }
 
 function closeCupView() {
