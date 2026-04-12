@@ -4853,6 +4853,7 @@ function exportChartReport() {
   + '<div class="card"><h2>Days Off Roast vs Score</h2><div id="dorWrap"><canvas id="cDor"></canvas></div></div>'
   + '</div>'
   + '\n<div class="card"><h2>Sensory Profile (Flavour Quality)</h2><div id="radarToggles" class="toggle-bar"></div><div id="radarWrap"><canvas id="cRad"></canvas></div></div>'
+  + '\n<div id="dlCupping"></div>'
   + '\n<script>\n'
   + 'var allBrews=' + JSON.stringify(exportBrews) + ';\n'
   + 'var beanOpts=' + JSON.stringify(beanOptions) + ';\n'
@@ -4918,7 +4919,50 @@ function exportChartReport() {
   + '  charts.rad.data.datasets=ds;charts.rad.update();\n'
   + '}\n'
   + 'rebuild();\n'
+  + _buildCuppingReportScript()
   + '<' + '/script></body></html>';
+
+  function _buildCuppingReportScript() {
+    if (!cupSessions.length) return '';
+    var cupData = cupSessions.map(function(s) {
+      var beanMap2 = {}; beans.forEach(function(b) { beanMap2[b.id] = b; });
+      return {
+        n: s.name || '', d: s.date || '',
+        cups: (s.cups || []).map(function(c) {
+          var bean = beanMap2[c.beanId];
+          var bName = bean ? [bean.roaster, bean.farmName, bean.processing, bean.varietal].filter(Boolean).join(' \u00b7 ') : 'Unknown';
+          return { bn: bName, nt: c.note || '', fq: c.fq != null ? c.fq : null, da: c.dryAroma || '', wa: c.wetAroma || '', h: c.hot || null, co: c.cool || null, lk: c.like || '', dl: c.dislike || '', ex: c.extra || '' };
+        })
+      };
+    });
+    return 'var cupData=' + JSON.stringify(cupData) + ';\n'
+      + '(function(){\n'
+      + 'var el=document.getElementById("dlCupping");if(!cupData.length)return;\n'
+      + 'var h=\'<div class="card"><h2>Cupping Sessions</h2>\';\n'
+      + 'cupData.forEach(function(s){\n'
+      + '  var dd=s.d?s.d.split("-"):[];var fmtD=dd.length===3?dd[2]+"-"+dd[1]+"-"+dd[0]:s.d;\n'
+      + '  var title=s.n||("Cupping \\u2014 "+fmtD);\n'
+      + '  h+=\'<div style="border:1px solid #eee;border-radius:10px;padding:14px;margin-bottom:14px">\';\n'
+      + '  h+=\'<div style="font-size:16px;font-weight:700;color:#1B2A4A;margin-bottom:2px">\'+title+\'</div>\';\n'
+      + '  h+=\'<div style="font-size:12px;color:#888;margin-bottom:12px">\'+fmtD+" \\u00b7 "+s.cups.length+" cup"+(s.cups.length!==1?"s":"")+\'</div>\';\n'
+      + '  s.cups.forEach(function(c,ci){\n'
+      + '    h+=\'<div style="background:#FAFAF8;border-radius:8px;padding:12px;margin-bottom:8px">\';\n'
+      + '    h+=\'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><div><span style="font-weight:700;color:#B8860B;margin-right:8px">\'+(ci+1)+\'</span><span style="font-weight:600;color:#2c2c2c">\'+c.bn+\'</span>\'+(c.nt?\'<span style="color:#888;margin-left:6px;font-size:13px">\'+c.nt+\'</span>\':"")+\'</div>\'+(c.fq!=null?\'<div style="font-size:18px;font-weight:700;color:#B8860B">\'+c.fq+\'<span style="font-size:11px;color:#888;font-weight:500">/10</span></div>\':"")+\'</div>\';\n'
+      + '    if(c.da||c.wa){h+=\'<div style="margin-bottom:6px">\';if(c.da)h+=\'<div style="font-size:12px"><span style="font-weight:600;color:#8B6F47;text-transform:uppercase;font-size:10px;letter-spacing:.5px">Dry: </span>\'+c.da+\'</div>\';if(c.wa)h+=\'<div style="font-size:12px"><span style="font-weight:600;color:#8B6F47;text-transform:uppercase;font-size:10px;letter-spacing:.5px">Wet: </span>\'+c.wa+\'</div>\';h+=\'</div>\'}\n'
+      + '    var hasH=c.h&&(c.h.acidity!=null||c.h.sweetness!=null||c.h.bitterness!=null||c.h.body!=null);\n'
+      + '    var hasC=c.co&&(c.co.acidity!=null||c.co.sweetness!=null||c.co.bitterness!=null||c.co.body!=null);\n'
+      + '    if(hasH||hasC){h+=\'<table style="width:100%;font-size:12px;border-collapse:collapse;margin-bottom:6px"><tr style="text-align:left;border-bottom:1px solid #eee"><th style="padding:4px 6px;font-weight:600;color:#888;font-size:11px"></th><th style="padding:4px 6px;font-size:11px;color:#888">Acid</th><th style="padding:4px 6px;font-size:11px;color:#888">Sweet</th><th style="padding:4px 6px;font-size:11px;color:#888">Bitter</th><th style="padding:4px 6px;font-size:11px;color:#888">Body</th></tr>\';\n'
+      + '      if(hasH)h+=\'<tr><td style="padding:4px 6px;font-weight:600;color:#C1666B">Hot</td><td style="padding:4px 6px">\'+(c.h.acidity!=null?c.h.acidity:"\\u2014")+\'</td><td style="padding:4px 6px">\'+(c.h.sweetness!=null?c.h.sweetness:"\\u2014")+\'</td><td style="padding:4px 6px">\'+(c.h.bitterness!=null?c.h.bitterness:"\\u2014")+\'</td><td style="padding:4px 6px">\'+(c.h.body!=null?c.h.body:"\\u2014")+\'</td></tr>\';\n'
+      + '      if(hasC)h+=\'<tr><td style="padding:4px 6px;font-weight:600;color:#4A90D9">Cool</td><td style="padding:4px 6px">\'+(c.co.acidity!=null?c.co.acidity:"\\u2014")+\'</td><td style="padding:4px 6px">\'+(c.co.sweetness!=null?c.co.sweetness:"\\u2014")+\'</td><td style="padding:4px 6px">\'+(c.co.bitterness!=null?c.co.bitterness:"\\u2014")+\'</td><td style="padding:4px 6px">\'+(c.co.body!=null?c.co.body:"\\u2014")+\'</td></tr>\';\n'
+      + '      h+=\'</table>\'}\n'
+      + '    if(c.lk||c.dl||c.ex){h+=\'<div style="font-size:12px;line-height:1.5">\';if(c.lk)h+=\'<div><span style="font-weight:600;color:#4A7C59">\\u2713 </span>\'+c.lk+\'</div>\';if(c.dl)h+=\'<div><span style="font-weight:600;color:#C1666B">\\u2717 </span>\'+c.dl+\'</div>\';if(c.ex)h+=\'<div style="color:#888">\'+c.ex+\'</div>\';h+=\'</div>\'}\n'
+      + '    h+=\'</div>\';\n'
+      + '  });\n'
+      + '  h+=\'</div>\';\n'
+      + '});\n'
+      + 'h+=\'</div>\';el.innerHTML=h;\n'
+      + '})();\n';
+  }
 
   const blob = new Blob([html], { type: 'text/html' });
   const url = URL.createObjectURL(blob);
@@ -4957,7 +5001,23 @@ function _buildReportData() {
       hi: intVal(b.hot?.intensity), ci: intVal(b.cool?.intensity),
     };
   });
-  return { b: exportBrews, o: beanOptions };
+  /* Cupping sessions – compact for URL */
+  const cupData = cupSessions.map(function(s) {
+    return {
+      n: s.name || '', d: s.date || '',
+      cups: (s.cups || []).map(function(c) {
+        const bean = beanMap[c.beanId];
+        const bName = bean ? [bean.roaster, bean.farmName, bean.processing, bean.varietal].filter(Boolean).join(' \u00b7 ') : 'Unknown';
+        return {
+          bn: bName, nt: c.note || '', fq: c.fq != null ? c.fq : null,
+          da: c.dryAroma || '', wa: c.wetAroma || '',
+          h: c.hot || null, co: c.cool || null,
+          lk: c.like || '', dl: c.dislike || '', ex: c.extra || ''
+        };
+      })
+    };
+  });
+  return { b: exportBrews, o: beanOptions, c: cupData };
 }
 
 /* Compress/decompress helpers using DeflateRaw */
@@ -5060,9 +5120,75 @@ function _renderSharedReport(data) {
     + '<h2 style="font-size:15px;color:#1B2A4A;margin:0 0 12px;text-transform:uppercase;letter-spacing:.5px">Sensory Profile (Flavour Quality)</h2>'
     + '<div id="rptRadarToggles" style="display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 8px"></div>'
     + '<div id="rptRadar" style="max-width:500px;margin:0 auto"></div></div>'
+    + '<div id="rptCupping"></div>'
     + '<div style="text-align:center;padding:30px 0 10px;font-size:12px;color:#bbb">Generated with Coffee Log</div>'
     + '</div>';
   document.body.appendChild(div);
+
+  /* Render cupping sessions if present */
+  if (data.c && data.c.length) {
+    var cupHtml = '<div style="background:#fff;border-radius:12px;padding:20px;margin-top:20px;box-shadow:0 1px 4px rgba(0,0,0,.06)">'
+      + '<h2 style="font-size:15px;color:#1B2A4A;margin:0 0 16px;text-transform:uppercase;letter-spacing:.5px">Cupping Sessions</h2>';
+    data.c.forEach(function(s) {
+      var dd = s.d ? s.d.split('-') : [];
+      var fmtD = dd.length === 3 ? dd[2] + '-' + dd[1] + '-' + dd[0] : s.d;
+      var title = s.n || ('Cupping \u2014 ' + fmtD);
+      cupHtml += '<div style="border:1px solid #eee;border-radius:10px;padding:14px;margin-bottom:14px">'
+        + '<div style="font-size:16px;font-weight:700;color:#1B2A4A;margin-bottom:2px">' + title + '</div>'
+        + '<div style="font-size:12px;color:#888;margin-bottom:12px">' + fmtD + ' \u00b7 ' + s.cups.length + ' cup' + (s.cups.length !== 1 ? 's' : '') + '</div>';
+      s.cups.forEach(function(c, ci) {
+        cupHtml += '<div style="background:#FAFAF8;border-radius:8px;padding:12px;margin-bottom:8px">';
+        cupHtml += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'
+          + '<div><span style="font-weight:700;color:#B8860B;margin-right:8px">' + (ci + 1) + '</span>'
+          + '<span style="font-weight:600;color:#2c2c2c">' + c.bn + '</span>'
+          + (c.nt ? '<span style="color:#888;margin-left:6px;font-size:13px">' + c.nt + '</span>' : '')
+          + '</div>'
+          + (c.fq != null ? '<div style="font-size:18px;font-weight:700;color:#B8860B">' + c.fq + '<span style="font-size:11px;color:#888;font-weight:500">/10</span></div>' : '')
+          + '</div>';
+        /* Aroma */
+        if (c.da || c.wa) {
+          cupHtml += '<div style="margin-bottom:6px">';
+          if (c.da) cupHtml += '<div style="font-size:12px"><span style="font-weight:600;color:#8B6F47;text-transform:uppercase;font-size:10px;letter-spacing:.5px">Dry: </span>' + c.da + '</div>';
+          if (c.wa) cupHtml += '<div style="font-size:12px"><span style="font-weight:600;color:#8B6F47;text-transform:uppercase;font-size:10px;letter-spacing:.5px">Wet: </span>' + c.wa + '</div>';
+          cupHtml += '</div>';
+        }
+        /* Scores table */
+        var hasHot = c.h && (c.h.acidity != null || c.h.sweetness != null || c.h.bitterness != null || c.h.body != null);
+        var hasCool = c.co && (c.co.acidity != null || c.co.sweetness != null || c.co.bitterness != null || c.co.body != null);
+        if (hasHot || hasCool) {
+          cupHtml += '<table style="width:100%;font-size:12px;border-collapse:collapse;margin-bottom:6px">'
+            + '<tr style="text-align:left;border-bottom:1px solid #eee"><th style="padding:4px 6px;font-weight:600;color:#888;font-size:11px"></th><th style="padding:4px 6px;font-size:11px;color:#888">Acid</th><th style="padding:4px 6px;font-size:11px;color:#888">Sweet</th><th style="padding:4px 6px;font-size:11px;color:#888">Bitter</th><th style="padding:4px 6px;font-size:11px;color:#888">Body</th></tr>';
+          if (hasHot) {
+            cupHtml += '<tr><td style="padding:4px 6px;font-weight:600;color:#C1666B">Hot</td>'
+              + '<td style="padding:4px 6px">' + (c.h.acidity != null ? c.h.acidity : '\u2014') + '</td>'
+              + '<td style="padding:4px 6px">' + (c.h.sweetness != null ? c.h.sweetness : '\u2014') + '</td>'
+              + '<td style="padding:4px 6px">' + (c.h.bitterness != null ? c.h.bitterness : '\u2014') + '</td>'
+              + '<td style="padding:4px 6px">' + (c.h.body != null ? c.h.body : '\u2014') + '</td></tr>';
+          }
+          if (hasCool) {
+            cupHtml += '<tr><td style="padding:4px 6px;font-weight:600;color:#4A90D9">Cool</td>'
+              + '<td style="padding:4px 6px">' + (c.co.acidity != null ? c.co.acidity : '\u2014') + '</td>'
+              + '<td style="padding:4px 6px">' + (c.co.sweetness != null ? c.co.sweetness : '\u2014') + '</td>'
+              + '<td style="padding:4px 6px">' + (c.co.bitterness != null ? c.co.bitterness : '\u2014') + '</td>'
+              + '<td style="padding:4px 6px">' + (c.co.body != null ? c.co.body : '\u2014') + '</td></tr>';
+          }
+          cupHtml += '</table>';
+        }
+        /* Notes */
+        if (c.lk || c.dl || c.ex) {
+          cupHtml += '<div style="font-size:12px;line-height:1.5">';
+          if (c.lk) cupHtml += '<div><span style="font-weight:600;color:#4A7C59">\u2713 </span>' + c.lk + '</div>';
+          if (c.dl) cupHtml += '<div><span style="font-weight:600;color:#C1666B">\u2717 </span>' + c.dl + '</div>';
+          if (c.ex) cupHtml += '<div style="color:#888">' + c.ex + '</div>';
+          cupHtml += '</div>';
+        }
+        cupHtml += '</div>';
+      });
+      cupHtml += '</div>';
+    });
+    cupHtml += '</div>';
+    document.getElementById('rptCupping').innerHTML = cupHtml;
+  }
   /* Responsive grid */
   const style = document.createElement('style');
   style.textContent = '#sharedReport canvas{width:100%!important;max-height:350px}@media(max-width:700px){#rptGrid{grid-template-columns:1fr!important}}';
