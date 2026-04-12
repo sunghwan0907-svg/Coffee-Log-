@@ -4936,15 +4936,12 @@ function exportChartReport() {
       };
     });
     return 'var cupData=' + JSON.stringify(cupData) + ';\n'
-      + '(function(){\n'
-      + 'var el=document.getElementById("dlCupping");if(!cupData.length)return;\n'
-      + 'var h=\'<div class="card"><h2>Cupping Sessions</h2>\';\n'
-      + 'cupData.forEach(function(s){\n'
-      + '  var dd=s.d?s.d.split("-"):[];var fmtD=dd.length===3?dd[2]+"-"+dd[1]+"-"+dd[0]:s.d;\n'
-      + '  var title=s.n||("Cupping \\u2014 "+fmtD);\n'
-      + '  h+=\'<div style="border:1px solid #eee;border-radius:10px;padding:14px;margin-bottom:14px">\';\n'
-      + '  h+=\'<div style="font-size:16px;font-weight:700;color:#1B2A4A;margin-bottom:2px">\'+title+\'</div>\';\n'
-      + '  h+=\'<div style="font-size:12px;color:#888;margin-bottom:12px">\'+fmtD+" \\u00b7 "+s.cups.length+" cup"+(s.cups.length!==1?"s":"")+\'</div>\';\n'
+      + 'var _dlCupActive=null;\n'
+      + 'function dlShowCup(idx){\n'
+      + '  if(_dlCupActive!=null){var pb=document.getElementById("dlCupBtn"+_dlCupActive);if(pb){pb.style.background="#FAFAF8";pb.style.color="#555";pb.style.borderColor="#D5D0CA"}}\n'
+      + '  _dlCupActive=idx;var ab=document.getElementById("dlCupBtn"+idx);if(ab){ab.style.background="#1B2A4A";ab.style.color="#fff";ab.style.borderColor="#1B2A4A"}\n'
+      + '  var s=cupData[idx];var dd=s.d?s.d.split("-"):[];var fmtD=dd.length===3?dd[2]+"-"+dd[1]+"-"+dd[0]:s.d;\n'
+      + '  var h=\'<div style="font-size:12px;color:#888;margin-bottom:12px">\'+fmtD+" \\u00b7 "+s.cups.length+" cup"+(s.cups.length!==1?"s":"")+\'</div>\';\n'
       + '  s.cups.forEach(function(c,ci){\n'
       + '    h+=\'<div style="background:#FAFAF8;border-radius:8px;padding:12px;margin-bottom:8px">\';\n'
       + '    h+=\'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><div><span style="font-weight:700;color:#B8860B;margin-right:8px">\'+(ci+1)+\'</span><span style="font-weight:600;color:#2c2c2c">\'+c.bn+\'</span>\'+(c.nt?\'<span style="color:#888;margin-left:6px;font-size:13px">\'+c.nt+\'</span>\':"")+\'</div>\'+(c.fq!=null?\'<div style="font-size:18px;font-weight:700;color:#B8860B">\'+c.fq+\'<span style="font-size:11px;color:#888;font-weight:500">/10</span></div>\':"")+\'</div>\';\n'
@@ -4958,9 +4955,23 @@ function exportChartReport() {
       + '    if(c.lk||c.dl||c.ex){h+=\'<div style="font-size:12px;line-height:1.5">\';if(c.lk)h+=\'<div><span style="font-weight:600;color:#4A7C59">\\u2713 </span>\'+c.lk+\'</div>\';if(c.dl)h+=\'<div><span style="font-weight:600;color:#C1666B">\\u2717 </span>\'+c.dl+\'</div>\';if(c.ex)h+=\'<div style="color:#888">\'+c.ex+\'</div>\';h+=\'</div>\'}\n'
       + '    h+=\'</div>\';\n'
       + '  });\n'
-      + '  h+=\'</div>\';\n'
+      + '  document.getElementById("dlCupContent").innerHTML=h;\n'
+      + '}\n'
+      + '(function(){\n'
+      + 'var el=document.getElementById("dlCupping");if(!cupData.length)return;\n'
+      + 'var h=\'<div class="card"><h2>Cupping Sessions</h2><div id="dlCupBtns" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px"></div><div id="dlCupContent"></div></div>\';\n'
+      + 'el.innerHTML=h;\n'
+      + 'var bar=document.getElementById("dlCupBtns");\n'
+      + 'cupData.forEach(function(s,i){\n'
+      + '  var dd=s.d?s.d.split("-"):[];var fmtD=dd.length===3?dd[2]+"-"+dd[1]+"-"+dd[0]:s.d;\n'
+      + '  var title=s.n||("Cupping \\u2014 "+fmtD);\n'
+      + '  var btn=document.createElement("button");btn.id="dlCupBtn"+i;\n'
+      + '  btn.textContent=title+" ("+s.cups.length+")";\n'
+      + '  btn.style.cssText="padding:8px 16px;border-radius:20px;border:1.5px solid #D5D0CA;background:#FAFAF8;font-size:13px;cursor:pointer;color:#555;font-family:inherit;transition:all .2s";\n'
+      + '  btn.onclick=function(){dlShowCup(i)};\n'
+      + '  bar.appendChild(btn);\n'
       + '});\n'
-      + 'h+=\'</div>\';el.innerHTML=h;\n'
+      + 'dlShowCup(0);\n'
       + '})();\n';
   }
 
@@ -5068,6 +5079,71 @@ async function shareCoachReport() {
   } catch(e) { showToast('Failed: ' + e.message); }
 }
 
+function _rptShowCupSession(idx) {
+  var data = window._rptCupData;
+  if (!data || !data[idx]) return;
+  /* Update button styles */
+  var prev = window._rptCupActive;
+  if (prev != null) {
+    var pb = document.getElementById('rptCupBtn' + prev);
+    if (pb) { pb.style.background = '#FAFAF8'; pb.style.color = '#555'; pb.style.borderColor = '#D5D0CA'; }
+  }
+  window._rptCupActive = idx;
+  var ab = document.getElementById('rptCupBtn' + idx);
+  if (ab) { ab.style.background = '#1B2A4A'; ab.style.color = '#fff'; ab.style.borderColor = '#1B2A4A'; }
+
+  var s = data[idx];
+  var dd = s.d ? s.d.split('-') : [];
+  var fmtD = dd.length === 3 ? dd[2] + '-' + dd[1] + '-' + dd[0] : s.d;
+  var h = '<div style="font-size:12px;color:#888;margin-bottom:12px">' + fmtD + ' \u00b7 ' + s.cups.length + ' cup' + (s.cups.length !== 1 ? 's' : '') + '</div>';
+  s.cups.forEach(function(c, ci) {
+    h += '<div style="background:#FAFAF8;border-radius:8px;padding:12px;margin-bottom:8px">';
+    h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'
+      + '<div><span style="font-weight:700;color:#B8860B;margin-right:8px">' + (ci + 1) + '</span>'
+      + '<span style="font-weight:600;color:#2c2c2c">' + c.bn + '</span>'
+      + (c.nt ? '<span style="color:#888;margin-left:6px;font-size:13px">' + c.nt + '</span>' : '')
+      + '</div>'
+      + (c.fq != null ? '<div style="font-size:18px;font-weight:700;color:#B8860B">' + c.fq + '<span style="font-size:11px;color:#888;font-weight:500">/10</span></div>' : '')
+      + '</div>';
+    if (c.da || c.wa) {
+      h += '<div style="margin-bottom:6px">';
+      if (c.da) h += '<div style="font-size:12px"><span style="font-weight:600;color:#8B6F47;text-transform:uppercase;font-size:10px;letter-spacing:.5px">Dry: </span>' + c.da + '</div>';
+      if (c.wa) h += '<div style="font-size:12px"><span style="font-weight:600;color:#8B6F47;text-transform:uppercase;font-size:10px;letter-spacing:.5px">Wet: </span>' + c.wa + '</div>';
+      h += '</div>';
+    }
+    var hasHot = c.h && (c.h.acidity != null || c.h.sweetness != null || c.h.bitterness != null || c.h.body != null);
+    var hasCool = c.co && (c.co.acidity != null || c.co.sweetness != null || c.co.bitterness != null || c.co.body != null);
+    if (hasHot || hasCool) {
+      h += '<table style="width:100%;font-size:12px;border-collapse:collapse;margin-bottom:6px">'
+        + '<tr style="text-align:left;border-bottom:1px solid #eee"><th style="padding:4px 6px;font-weight:600;color:#888;font-size:11px"></th><th style="padding:4px 6px;font-size:11px;color:#888">Acid</th><th style="padding:4px 6px;font-size:11px;color:#888">Sweet</th><th style="padding:4px 6px;font-size:11px;color:#888">Bitter</th><th style="padding:4px 6px;font-size:11px;color:#888">Body</th></tr>';
+      if (hasHot) {
+        h += '<tr><td style="padding:4px 6px;font-weight:600;color:#C1666B">Hot</td>'
+          + '<td style="padding:4px 6px">' + (c.h.acidity != null ? c.h.acidity : '\u2014') + '</td>'
+          + '<td style="padding:4px 6px">' + (c.h.sweetness != null ? c.h.sweetness : '\u2014') + '</td>'
+          + '<td style="padding:4px 6px">' + (c.h.bitterness != null ? c.h.bitterness : '\u2014') + '</td>'
+          + '<td style="padding:4px 6px">' + (c.h.body != null ? c.h.body : '\u2014') + '</td></tr>';
+      }
+      if (hasCool) {
+        h += '<tr><td style="padding:4px 6px;font-weight:600;color:#4A90D9">Cool</td>'
+          + '<td style="padding:4px 6px">' + (c.co.acidity != null ? c.co.acidity : '\u2014') + '</td>'
+          + '<td style="padding:4px 6px">' + (c.co.sweetness != null ? c.co.sweetness : '\u2014') + '</td>'
+          + '<td style="padding:4px 6px">' + (c.co.bitterness != null ? c.co.bitterness : '\u2014') + '</td>'
+          + '<td style="padding:4px 6px">' + (c.co.body != null ? c.co.body : '\u2014') + '</td></tr>';
+      }
+      h += '</table>';
+    }
+    if (c.lk || c.dl || c.ex) {
+      h += '<div style="font-size:12px;line-height:1.5">';
+      if (c.lk) h += '<div><span style="font-weight:600;color:#4A7C59">\u2713 </span>' + c.lk + '</div>';
+      if (c.dl) h += '<div><span style="font-weight:600;color:#C1666B">\u2717 </span>' + c.dl + '</div>';
+      if (c.ex) h += '<div style="color:#888">' + c.ex + '</div>';
+      h += '</div>';
+    }
+    h += '</div>';
+  });
+  document.getElementById('rptCupContent').innerHTML = h;
+}
+
 /* Render shared report if URL has ?r= or ?report= param */
 function _checkSharedReport() {
   const params = new URLSearchParams(location.search);
@@ -5125,69 +5201,34 @@ function _renderSharedReport(data) {
     + '</div>';
   document.body.appendChild(div);
 
-  /* Render cupping sessions if present */
+  /* Render cupping sessions with session picker */
   if (data.c && data.c.length) {
-    var cupHtml = '<div style="background:#fff;border-radius:12px;padding:20px;margin-top:20px;box-shadow:0 1px 4px rgba(0,0,0,.06)">'
-      + '<h2 style="font-size:15px;color:#1B2A4A;margin:0 0 16px;text-transform:uppercase;letter-spacing:.5px">Cupping Sessions</h2>';
-    data.c.forEach(function(s) {
+    var cupContainer = '<div style="background:#fff;border-radius:12px;padding:20px;margin-top:20px;box-shadow:0 1px 4px rgba(0,0,0,.06)">'
+      + '<h2 style="font-size:15px;color:#1B2A4A;margin:0 0 16px;text-transform:uppercase;letter-spacing:.5px">Cupping Sessions</h2>'
+      + '<div id="rptCupBtns" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px"></div>'
+      + '<div id="rptCupContent"></div>'
+      + '</div>';
+    document.getElementById('rptCupping').innerHTML = cupContainer;
+
+    window._rptCupData = data.c;
+    window._rptCupActive = null;
+
+    /* Build session picker buttons */
+    var btnBar = document.getElementById('rptCupBtns');
+    data.c.forEach(function(s, idx) {
       var dd = s.d ? s.d.split('-') : [];
       var fmtD = dd.length === 3 ? dd[2] + '-' + dd[1] + '-' + dd[0] : s.d;
       var title = s.n || ('Cupping \u2014 ' + fmtD);
-      cupHtml += '<div style="border:1px solid #eee;border-radius:10px;padding:14px;margin-bottom:14px">'
-        + '<div style="font-size:16px;font-weight:700;color:#1B2A4A;margin-bottom:2px">' + title + '</div>'
-        + '<div style="font-size:12px;color:#888;margin-bottom:12px">' + fmtD + ' \u00b7 ' + s.cups.length + ' cup' + (s.cups.length !== 1 ? 's' : '') + '</div>';
-      s.cups.forEach(function(c, ci) {
-        cupHtml += '<div style="background:#FAFAF8;border-radius:8px;padding:12px;margin-bottom:8px">';
-        cupHtml += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'
-          + '<div><span style="font-weight:700;color:#B8860B;margin-right:8px">' + (ci + 1) + '</span>'
-          + '<span style="font-weight:600;color:#2c2c2c">' + c.bn + '</span>'
-          + (c.nt ? '<span style="color:#888;margin-left:6px;font-size:13px">' + c.nt + '</span>' : '')
-          + '</div>'
-          + (c.fq != null ? '<div style="font-size:18px;font-weight:700;color:#B8860B">' + c.fq + '<span style="font-size:11px;color:#888;font-weight:500">/10</span></div>' : '')
-          + '</div>';
-        /* Aroma */
-        if (c.da || c.wa) {
-          cupHtml += '<div style="margin-bottom:6px">';
-          if (c.da) cupHtml += '<div style="font-size:12px"><span style="font-weight:600;color:#8B6F47;text-transform:uppercase;font-size:10px;letter-spacing:.5px">Dry: </span>' + c.da + '</div>';
-          if (c.wa) cupHtml += '<div style="font-size:12px"><span style="font-weight:600;color:#8B6F47;text-transform:uppercase;font-size:10px;letter-spacing:.5px">Wet: </span>' + c.wa + '</div>';
-          cupHtml += '</div>';
-        }
-        /* Scores table */
-        var hasHot = c.h && (c.h.acidity != null || c.h.sweetness != null || c.h.bitterness != null || c.h.body != null);
-        var hasCool = c.co && (c.co.acidity != null || c.co.sweetness != null || c.co.bitterness != null || c.co.body != null);
-        if (hasHot || hasCool) {
-          cupHtml += '<table style="width:100%;font-size:12px;border-collapse:collapse;margin-bottom:6px">'
-            + '<tr style="text-align:left;border-bottom:1px solid #eee"><th style="padding:4px 6px;font-weight:600;color:#888;font-size:11px"></th><th style="padding:4px 6px;font-size:11px;color:#888">Acid</th><th style="padding:4px 6px;font-size:11px;color:#888">Sweet</th><th style="padding:4px 6px;font-size:11px;color:#888">Bitter</th><th style="padding:4px 6px;font-size:11px;color:#888">Body</th></tr>';
-          if (hasHot) {
-            cupHtml += '<tr><td style="padding:4px 6px;font-weight:600;color:#C1666B">Hot</td>'
-              + '<td style="padding:4px 6px">' + (c.h.acidity != null ? c.h.acidity : '\u2014') + '</td>'
-              + '<td style="padding:4px 6px">' + (c.h.sweetness != null ? c.h.sweetness : '\u2014') + '</td>'
-              + '<td style="padding:4px 6px">' + (c.h.bitterness != null ? c.h.bitterness : '\u2014') + '</td>'
-              + '<td style="padding:4px 6px">' + (c.h.body != null ? c.h.body : '\u2014') + '</td></tr>';
-          }
-          if (hasCool) {
-            cupHtml += '<tr><td style="padding:4px 6px;font-weight:600;color:#4A90D9">Cool</td>'
-              + '<td style="padding:4px 6px">' + (c.co.acidity != null ? c.co.acidity : '\u2014') + '</td>'
-              + '<td style="padding:4px 6px">' + (c.co.sweetness != null ? c.co.sweetness : '\u2014') + '</td>'
-              + '<td style="padding:4px 6px">' + (c.co.bitterness != null ? c.co.bitterness : '\u2014') + '</td>'
-              + '<td style="padding:4px 6px">' + (c.co.body != null ? c.co.body : '\u2014') + '</td></tr>';
-          }
-          cupHtml += '</table>';
-        }
-        /* Notes */
-        if (c.lk || c.dl || c.ex) {
-          cupHtml += '<div style="font-size:12px;line-height:1.5">';
-          if (c.lk) cupHtml += '<div><span style="font-weight:600;color:#4A7C59">\u2713 </span>' + c.lk + '</div>';
-          if (c.dl) cupHtml += '<div><span style="font-weight:600;color:#C1666B">\u2717 </span>' + c.dl + '</div>';
-          if (c.ex) cupHtml += '<div style="color:#888">' + c.ex + '</div>';
-          cupHtml += '</div>';
-        }
-        cupHtml += '</div>';
-      });
-      cupHtml += '</div>';
+      var btn = document.createElement('button');
+      btn.id = 'rptCupBtn' + idx;
+      btn.textContent = title + ' (' + s.cups.length + ')';
+      btn.style.cssText = 'padding:8px 16px;border-radius:20px;border:1.5px solid #D5D0CA;background:#FAFAF8;font-size:13px;cursor:pointer;color:#555;font-family:inherit;transition:all .2s';
+      btn.onclick = function() { _rptShowCupSession(idx); };
+      btnBar.appendChild(btn);
     });
-    cupHtml += '</div>';
-    document.getElementById('rptCupping').innerHTML = cupHtml;
+
+    /* Auto-select first session */
+    _rptShowCupSession(0);
   }
   /* Responsive grid */
   const style = document.createElement('style');
