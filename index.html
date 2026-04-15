@@ -3511,65 +3511,93 @@ function viewToggleSection(key) {
 }
 
 function _viewSectionContent(c, key) {
+  var ci = window._viewCupOpen;
   var h = '';
+  var taStyle = 'width:100%;border:none;background:var(--bg);border-radius:8px;padding:10px;font-size:14px;font-family:inherit;resize:vertical;color:var(--text);line-height:1.4';
   if (key === 'aroma') {
-    if (!c.dryAroma && !c.wetAroma) return '<div style="padding:8px 4px;font-size:13px;color:var(--text3)">No aroma notes</div>';
     h += '<div style="background:var(--bg);border-radius:12px;overflow:hidden">';
-    if (c.dryAroma) {
-      h += '<div style="padding:10px 14px' + (c.wetAroma ? ';border-bottom:1px solid rgba(0,0,0,.04)' : '') + '">'
-        + '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#8B6F47;margin-bottom:4px">Dry Aroma</div>'
-        + '<div style="font-size:14px;color:var(--text);line-height:1.4">' + c.dryAroma + '</div></div>';
-    }
-    if (c.wetAroma) {
-      h += '<div style="padding:10px 14px">'
-        + '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#8B6F47;margin-bottom:4px">Wet Aroma</div>'
-        + '<div style="font-size:14px;color:var(--text);line-height:1.4">' + c.wetAroma + '</div></div>';
-    }
+    h += '<div style="padding:10px 14px;border-bottom:1px solid rgba(0,0,0,.04)">'
+      + '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#8B6F47;margin-bottom:4px">Dry Aroma</div>'
+      + '<textarea id="ve_dryAroma" rows="2" style="' + taStyle + '" onchange="viewEditNote(' + ci + ',\'dryAroma\',this.value)">' + (c.dryAroma || '') + '</textarea></div>';
+    h += '<div style="padding:10px 14px">'
+      + '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#8B6F47;margin-bottom:4px">Wet Aroma</div>'
+      + '<textarea id="ve_wetAroma" rows="2" style="' + taStyle + '" onchange="viewEditNote(' + ci + ',\'wetAroma\',this.value)">' + (c.wetAroma || '') + '</textarea></div>';
     h += '</div>';
   }
   if (key === 'hot' || key === 'cool') {
+    if (!c[key]) c[key] = { acidity: null, sweetness: null, bitterness: null, body: null };
     var scores = c[key];
-    if (!scores || (scores.acidity == null && scores.sweetness == null && scores.bitterness == null && scores.body == null)) {
-      return '<div style="padding:8px 4px;font-size:13px;color:var(--text3)">No ' + key + ' scores</div>';
-    }
-    h += '<div style="background:var(--bg);border-radius:12px;overflow:hidden">';
+    var scoreColor = key === 'hot' ? 'var(--hot)' : 'var(--cool)';
+    h += '<div style="background:var(--bg);border-radius:12px;padding:4px 14px 8px">';
     ['acidity','sweetness','bitterness','body'].forEach(function(attr) {
-      if (scores[attr] != null) {
-        h += '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid rgba(0,0,0,.04)">'
-          + '<span style="font-size:14px;color:var(--text);text-transform:capitalize">' + attr + '</span>'
-          + '<span style="font-size:16px;font-weight:700;color:' + (key === 'hot' ? '#C1666B' : '#4A90D9') + '">' + scores[attr] + '</span></div>';
+      var label = attr.charAt(0).toUpperCase() + attr.slice(1);
+      h += '<div style="display:flex;align-items:center;padding:10px 0;border-bottom:1px solid rgba(0,0,0,.04)">'
+        + '<div style="width:80px;font-size:13px;font-weight:500;color:var(--text)">' + label + '</div>'
+        + '<div style="flex:1;display:grid;grid-template-columns:repeat(10,1fr);gap:3px">';
+      for (var n = 0; n <= 9; n++) {
+        var active = scores[attr] === n;
+        h += '<button onclick="viewEditScore(' + ci + ',\'' + key + '\',\'' + attr + '\',' + n + ')" '
+          + 'style="height:34px;border-radius:8px;border:none;background:' + (active ? scoreColor : 'var(--card)') + ';'
+          + 'font-size:13px;cursor:pointer;color:' + (active ? '#fff' : 'var(--text3)') + ';font-weight:600;transition:all .15s">' + n + '</button>';
       }
+      h += '</div></div>';
     });
     h += '</div>';
   }
   if (key === 'fq') {
-    var fq = c.fq != null ? c.fq : (c.total != null ? c.total : null);
-    if (fq == null || fq === 0) return '<div style="padding:8px 4px;font-size:13px;color:var(--text3)">No FQ score</div>';
-    h += '<div style="background:var(--bg);border-radius:12px;padding:20px;text-align:center">'
-      + '<div style="font-size:36px;font-weight:700;color:var(--c-cupping)">' + fq + '<span style="font-size:16px;color:var(--text3);font-weight:500"> /10</span></div>'
+    var fq = c.fq != null ? c.fq : 0;
+    h += '<div style="background:var(--bg);border-radius:12px;padding:20px;display:flex;align-items:center;justify-content:center;gap:16px">'
+      + '<button onclick="viewEditFQ(' + ci + ',-0.5)" style="width:40px;height:40px;border-radius:50%;border:none;background:var(--card);font-size:20px;cursor:pointer;color:var(--text);font-weight:500">\u2212</button>'
+      + '<div style="min-width:56px;text-align:center"><span id="veFQ" style="font-size:36px;font-weight:700;color:var(--c-cupping)">' + fq + '</span><span style="font-size:16px;color:var(--text3);font-weight:500"> /10</span></div>'
+      + '<button onclick="viewEditFQ(' + ci + ',0.5)" style="width:40px;height:40px;border-radius:50%;border:none;background:var(--card);font-size:20px;cursor:pointer;color:var(--text);font-weight:500">+</button>'
       + '</div>';
   }
   if (key === 'notes') {
-    if (!c.like && !c.dislike && !c.extra) return '<div style="padding:8px 4px;font-size:13px;color:var(--text3)">No notes</div>';
     h += '<div style="background:var(--bg);border-radius:12px;overflow:hidden">';
-    if (c.like) {
-      h += '<div style="padding:10px 14px;border-bottom:1px solid rgba(0,0,0,.04)">'
-        + '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#4A7C59;margin-bottom:4px">What I Like</div>'
-        + '<div style="font-size:14px;color:var(--text);line-height:1.4">' + c.like + '</div></div>';
-    }
-    if (c.dislike) {
-      h += '<div style="padding:10px 14px;border-bottom:1px solid rgba(0,0,0,.04)">'
-        + '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#C1666B;margin-bottom:4px">What I Don\'t Like</div>'
-        + '<div style="font-size:14px;color:var(--text);line-height:1.4">' + c.dislike + '</div></div>';
-    }
-    if (c.extra) {
-      h += '<div style="padding:10px 14px">'
-        + '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text3);margin-bottom:4px">Additional</div>'
-        + '<div style="font-size:14px;color:var(--text);line-height:1.4">' + c.extra + '</div></div>';
-    }
+    h += '<div style="padding:10px 14px;border-bottom:1px solid rgba(0,0,0,.04)">'
+      + '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#4A7C59;margin-bottom:4px">What I Like</div>'
+      + '<textarea rows="2" style="' + taStyle + '" onchange="viewEditNote(' + ci + ',\'like\',this.value)">' + (c.like || '') + '</textarea></div>';
+    h += '<div style="padding:10px 14px;border-bottom:1px solid rgba(0,0,0,.04)">'
+      + '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#C1666B;margin-bottom:4px">What I Don\'t Like</div>'
+      + '<textarea rows="2" style="' + taStyle + '" onchange="viewEditNote(' + ci + ',\'dislike\',this.value)">' + (c.dislike || '') + '</textarea></div>';
+    h += '<div style="padding:10px 14px">'
+      + '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text3);margin-bottom:4px">Additional</div>'
+      + '<textarea rows="2" style="' + taStyle + '" onchange="viewEditNote(' + ci + ',\'extra\',this.value)">' + (c.extra || '') + '</textarea></div>';
     h += '</div>';
   }
   return h;
+}
+
+function _getViewSession() {
+  return cupSessions.find(function(x) { return x.id === window._viewSessionId; });
+}
+
+function viewEditNote(cupIdx, field, val) {
+  var s = _getViewSession();
+  if (!s || !s.cups[cupIdx]) return;
+  s.cups[cupIdx][field] = val;
+  persist(K_CUPPING, cupSessions);
+}
+
+function viewEditScore(cupIdx, section, attr, val) {
+  var s = _getViewSession();
+  if (!s || !s.cups[cupIdx]) return;
+  if (!s.cups[cupIdx][section]) s.cups[cupIdx][section] = {};
+  var cur = s.cups[cupIdx][section][attr];
+  s.cups[cupIdx][section][attr] = (cur === val) ? null : val;
+  persist(K_CUPPING, cupSessions);
+  _renderCupSessionView();
+}
+
+function viewEditFQ(cupIdx, delta) {
+  var s = _getViewSession();
+  if (!s || !s.cups[cupIdx]) return;
+  var fq = s.cups[cupIdx].fq != null ? s.cups[cupIdx].fq : 0;
+  fq = Math.max(0, Math.min(10, Math.round((fq + delta) * 10) / 10));
+  s.cups[cupIdx].fq = fq;
+  persist(K_CUPPING, cupSessions);
+  var el = document.getElementById('veFQ');
+  if (el) el.textContent = fq;
 }
 
 function closeCupView() {
