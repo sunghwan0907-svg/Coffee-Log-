@@ -1336,6 +1336,10 @@ body {
         <div id="cupPickerView">
           <div id="cupPickerList"></div>
           <div style="padding:12px 16px 20px">
+            <div style="margin-bottom:12px">
+              <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text3);margin-bottom:6px">General Notes</div>
+              <textarea id="cupGeneralNotes" rows="3" style="width:100%;border:none;background:var(--card);border-radius:12px;padding:14px;font-size:14px;font-family:inherit;resize:vertical;color:var(--text);line-height:1.4;box-shadow:0 1px 3px rgba(0,0,0,.04)" placeholder="Overall thoughts on this session…"></textarea>
+            </div>
             <button onclick="saveCupSession()" class="btn-primary" style="width:100%;padding:14px;border-radius:12px;font-size:16px;font-weight:600;border:none;color:#fff;background:var(--c-cupping);cursor:pointer">Save Session</button>
             <button onclick="cancelCupping()" style="width:100%;padding:12px;border-radius:12px;font-size:14px;border:1.5px solid var(--border);background:none;color:var(--text2);cursor:pointer;margin-top:8px">Cancel</button>
           </div>
@@ -3123,14 +3127,15 @@ function _cupSectionContent(i, key) {
     );
   }
   if (key === 'fq') {
+    var curFQ = window._cupScores[i].fq || '';
     return _cupCard(
-      '<div style="padding:16px;display:flex;align-items:center;justify-content:space-between">'
-      + '<div style="font-size:15px;font-weight:600;color:var(--text)">Score</div>'
-      + '<div style="display:flex;align-items:center;gap:12px">'
-      + '<button onclick="cupAdjFQ(' + i + ',-0.5)" style="width:36px;height:36px;border-radius:50%;border:none;background:var(--bg);font-size:18px;cursor:pointer;color:var(--text);font-weight:500">\u2212</button>'
-      + '<div style="min-width:48px;text-align:center"><span id="cupFQ' + i + '" style="font-size:28px;font-weight:700;color:var(--c-cupping)">' + window._cupScores[i].fq + '</span><span style="font-size:14px;color:var(--text3);font-weight:500"> /10</span></div>'
-      + '<button onclick="cupAdjFQ(' + i + ',0.5)" style="width:36px;height:36px;border-radius:50%;border:none;background:var(--bg);font-size:18px;cursor:pointer;color:var(--text);font-weight:500">+</button>'
-      + '</div></div>'
+      '<div style="padding:20px;display:flex;align-items:center;justify-content:center;gap:8px">'
+      + '<input id="cupFQ' + i + '" type="number" step="0.5" min="0" max="10" value="' + curFQ + '" '
+      + 'style="width:80px;font-size:32px;font-weight:700;color:var(--c-cupping);text-align:center;border:none;background:transparent;font-family:inherit;outline:none;border-bottom:2px solid var(--border);-moz-appearance:textfield" '
+      + 'onfocus="this.style.borderBottomColor=\'var(--c-cupping)\'" onblur="this.style.borderBottomColor=\'var(--border)\'" '
+      + 'onchange="cupSetFQ(' + i + ',this.value)">'
+      + '<span style="font-size:16px;color:var(--text3);font-weight:500">/10</span>'
+      + '</div>'
     );
   }
   if (key === 'notes') {
@@ -3207,13 +3212,11 @@ function cupSetScore(cupIdx, section, key, val) {
   }
 }
 
-function cupAdjFQ(cupIdx, delta) {
-  var s = window._cupScores[cupIdx];
-  var val = s.fq + delta;
-  if (val < 0) val = 0;
-  if (val > 10) val = 10;
-  s.fq = Math.round(val * 10) / 10;
-  document.getElementById('cupFQ' + cupIdx).textContent = s.fq;
+function cupSetFQ(cupIdx, val) {
+  var fq = parseFloat(val);
+  if (isNaN(fq)) fq = 0;
+  fq = Math.max(0, Math.min(10, Math.round(fq * 10) / 10));
+  window._cupScores[cupIdx].fq = fq;
 }
 
 function cancelCupping() {
@@ -3241,10 +3244,12 @@ function saveCupSession() {
   if (!window._cupScores) return;
   _autosaveNotes();
   const sessionName = (document.getElementById('cupSessionName') || {}).value || '';
+  const generalNotes = (document.getElementById('cupGeneralNotes') || {}).value || '';
   const session = {
     id: uid(),
     date: today(),
     name: sessionName,
+    generalNotes: generalNotes,
     cups: cupEntries.map(function(e, i) {
       var sc = window._cupScores[i];
       var notes = _getCupNotes(i);
@@ -3273,6 +3278,7 @@ function saveCupSession() {
   document.getElementById('cupSetup').style.display = '';
   document.getElementById('cupScoring').style.display = 'none';
   if (document.getElementById('cupSessionName')) document.getElementById('cupSessionName').value = '';
+  if (document.getElementById('cupGeneralNotes')) document.getElementById('cupGeneralNotes').value = '';
   showToast('Cupping session saved');
   renderCupping();
 }
@@ -3409,9 +3415,12 @@ function _renderCupSessionView() {
   const title = s.name || ('Cupping \u2014 ' + fmtD);
 
   let html = '<div style="max-width:430px;margin:0 auto;padding:16px">';
-  /* Header */
+  /* Header \u2014 editable title */
   html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">'
-    + '<div><div style="font-size:20px;font-weight:700;color:var(--text)">' + title + '</div>'
+    + '<div style="flex:1;min-width:0"><input id="veTitle" value="' + (s.name || '').replace(/"/g, '&quot;') + '" '
+    + 'style="font-size:20px;font-weight:700;color:var(--text);border:none;background:transparent;width:100%;padding:0;font-family:inherit;outline:none;border-bottom:1.5px solid transparent" '
+    + 'onfocus="this.style.borderBottomColor=\'var(--c-cupping)\'" onblur="this.style.borderBottomColor=\'transparent\';viewEditTitle(this.value)" '
+    + 'placeholder="Session name">'
     + '<div style="font-size:13px;color:var(--text3);margin-top:2px">' + fmtD + ' \u00b7 ' + (s.cups||[]).length + ' cup' + ((s.cups||[]).length !== 1 ? 's' : '') + '</div></div>'
     + '<button onclick="closeCupView()" style="border:none;background:var(--bg);width:32px;height:32px;border-radius:50%;font-size:18px;color:var(--text3);cursor:pointer;flex-shrink:0">\u00d7</button>'
     + '</div>';
@@ -3479,7 +3488,13 @@ function _renderCupSessionView() {
     }
   });
 
-  html += '<button onclick="deleteCupSession(\'' + s.id + '\')" style="width:100%;padding:12px;border-radius:12px;border:1.5px solid #C1666B;background:none;color:#C1666B;font-size:14px;cursor:pointer;margin-top:4px">Delete Session</button>';
+  /* General session notes */
+  html += '<div style="margin-top:14px">'
+    + '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text3);margin-bottom:6px;padding:0 4px">General Notes</div>'
+    + '<textarea id="veGeneralNotes" rows="3" style="width:100%;border:none;background:var(--card);border-radius:12px;padding:14px;font-size:14px;font-family:inherit;resize:vertical;color:var(--text);line-height:1.4;box-shadow:0 1px 3px rgba(0,0,0,.04)" '
+    + 'onchange="viewEditSessionField(\'generalNotes\',this.value)" placeholder="Overall thoughts on this session…">' + (s.generalNotes || '') + '</textarea></div>';
+
+  html += '<button onclick="deleteCupSession(\'' + s.id + '\')" style="width:100%;padding:12px;border-radius:12px;border:1.5px solid #C1666B;background:none;color:#C1666B;font-size:14px;cursor:pointer;margin-top:14px">Delete Session</button>';
   html += '</div>';
 
   var existing = document.getElementById('cupViewOverlay');
@@ -3545,11 +3560,13 @@ function _viewSectionContent(c, key) {
     h += '</div>';
   }
   if (key === 'fq') {
-    var fq = c.fq != null ? c.fq : 0;
-    h += '<div style="background:var(--bg);border-radius:12px;padding:20px;display:flex;align-items:center;justify-content:center;gap:16px">'
-      + '<button onclick="viewEditFQ(' + ci + ',-0.5)" style="width:40px;height:40px;border-radius:50%;border:none;background:var(--card);font-size:20px;cursor:pointer;color:var(--text);font-weight:500">\u2212</button>'
-      + '<div style="min-width:56px;text-align:center"><span id="veFQ" style="font-size:36px;font-weight:700;color:var(--c-cupping)">' + fq + '</span><span style="font-size:16px;color:var(--text3);font-weight:500"> /10</span></div>'
-      + '<button onclick="viewEditFQ(' + ci + ',0.5)" style="width:40px;height:40px;border-radius:50%;border:none;background:var(--card);font-size:20px;cursor:pointer;color:var(--text);font-weight:500">+</button>'
+    var fq = c.fq != null ? c.fq : '';
+    h += '<div style="background:var(--bg);border-radius:12px;padding:20px;display:flex;align-items:center;justify-content:center;gap:8px">'
+      + '<input id="veFQ" type="number" step="0.5" min="0" max="10" value="' + fq + '" '
+      + 'style="width:80px;font-size:36px;font-weight:700;color:var(--c-cupping);text-align:center;border:none;background:transparent;font-family:inherit;outline:none;border-bottom:2px solid var(--border);-moz-appearance:textfield" '
+      + 'onfocus="this.style.borderBottomColor=\'var(--c-cupping)\'" onblur="this.style.borderBottomColor=\'var(--border)\'" '
+      + 'onchange="viewEditFQInput(' + ci + ',this.value)">'
+      + '<span style="font-size:16px;color:var(--text3);font-weight:500">/10</span>'
       + '</div>';
   }
   if (key === 'notes') {
@@ -3589,15 +3606,29 @@ function viewEditScore(cupIdx, section, attr, val) {
   _renderCupSessionView();
 }
 
-function viewEditFQ(cupIdx, delta) {
+function viewEditFQInput(cupIdx, val) {
   var s = _getViewSession();
   if (!s || !s.cups[cupIdx]) return;
-  var fq = s.cups[cupIdx].fq != null ? s.cups[cupIdx].fq : 0;
-  fq = Math.max(0, Math.min(10, Math.round((fq + delta) * 10) / 10));
+  var fq = parseFloat(val);
+  if (isNaN(fq)) fq = 0;
+  fq = Math.max(0, Math.min(10, Math.round(fq * 10) / 10));
   s.cups[cupIdx].fq = fq;
   persist(K_CUPPING, cupSessions);
-  var el = document.getElementById('veFQ');
-  if (el) el.textContent = fq;
+}
+
+function viewEditTitle(val) {
+  var s = _getViewSession();
+  if (!s) return;
+  s.name = val.trim();
+  persist(K_CUPPING, cupSessions);
+  renderCupHistory();
+}
+
+function viewEditSessionField(field, val) {
+  var s = _getViewSession();
+  if (!s) return;
+  s[field] = val;
+  persist(K_CUPPING, cupSessions);
 }
 
 function closeCupView() {
@@ -4775,7 +4806,7 @@ function exportXLSX() {
 
   /* ── Cupping tab ── */
   if (cupSessions.length) {
-    const cupRows = [['Session','Date','Cup #','Bean','Note','Hot Acidity','Hot Sweetness','Hot Bitterness','Hot Body','Cool Acidity','Cool Sweetness','Cool Bitterness','Cool Body','Flavour Quality','Dry Aroma','Wet Aroma','What I Like','What I Don\'t Like','Additional Notes']];
+    const cupRows = [['Session','Date','Cup #','Bean','Note','Hot Acidity','Hot Sweetness','Hot Bitterness','Hot Body','Cool Acidity','Cool Sweetness','Cool Bitterness','Cool Body','Flavour Quality','Dry Aroma','Wet Aroma','What I Like','What I Don\'t Like','Additional Notes','General Notes']];
     cupSessions.forEach(function(s) {
       const dd = s.date ? s.date.split('-') : [];
       const fmtD = dd.length === 3 ? dd[2] + '/' + dd[1] + '/' + dd[0] : s.date || '';
@@ -4787,7 +4818,8 @@ function exportXLSX() {
           c.hot ? c.hot.acidity : '', c.hot ? c.hot.sweetness : '', c.hot ? c.hot.bitterness : '', c.hot ? c.hot.body : '',
           c.cool ? c.cool.acidity : '', c.cool ? c.cool.sweetness : '', c.cool ? c.cool.bitterness : '', c.cool ? c.cool.body : '',
           c.fq != null ? c.fq : '',
-          c.dryAroma || '', c.wetAroma || '', c.like || '', c.dislike || '', c.extra || ''
+          c.dryAroma || '', c.wetAroma || '', c.like || '', c.dislike || '', c.extra || '',
+          ci === 0 ? (s.generalNotes || '') : ''
         ]);
       });
     });
