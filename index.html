@@ -5211,19 +5211,21 @@ function _rptShowCupSession(idx) {
     if (hasHot || hasCool) {
       h += '<table style="width:100%;font-size:12px;border-collapse:separate;border-spacing:0;margin-bottom:8px;background:#FAFAF8;border-radius:6px;overflow:hidden">'
         + '<tr style="background:#F0EBE2"><th style="padding:5px 8px;font-weight:700;color:#888;font-size:9.5px;text-transform:uppercase;letter-spacing:.6px;text-align:left"></th><th style="padding:5px 8px;font-size:9.5px;color:#888;text-transform:uppercase;letter-spacing:.6px;font-weight:700;text-align:center">Acid</th><th style="padding:5px 8px;font-size:9.5px;color:#888;text-transform:uppercase;letter-spacing:.6px;font-weight:700;text-align:center">Sweet</th><th style="padding:5px 8px;font-size:9.5px;color:#888;text-transform:uppercase;letter-spacing:.6px;font-weight:700;text-align:center">Bitter</th><th style="padding:5px 8px;font-size:9.5px;color:#888;text-transform:uppercase;letter-spacing:.6px;font-weight:700;text-align:center">Body</th></tr>';
+      var _suf = '<span style="font-size:9px;color:#b0a890;font-weight:500;margin-left:1px">/9</span>';
+      var _val = function(v) { return v != null ? (v + _suf) : '\u2014'; };
       if (hasHot) {
         h += '<tr><td style="padding:7px 8px;font-weight:700;color:#C1666B;font-size:11px">Hot</td>'
-          + '<td style="padding:7px 8px;text-align:center;font-weight:600;color:#3a3a3a">' + (c.h.acidity != null ? c.h.acidity : '\u2014') + '</td>'
-          + '<td style="padding:7px 8px;text-align:center;font-weight:600;color:#3a3a3a">' + (c.h.sweetness != null ? c.h.sweetness : '\u2014') + '</td>'
-          + '<td style="padding:7px 8px;text-align:center;font-weight:600;color:#3a3a3a">' + (c.h.bitterness != null ? c.h.bitterness : '\u2014') + '</td>'
-          + '<td style="padding:7px 8px;text-align:center;font-weight:600;color:#3a3a3a">' + (c.h.body != null ? c.h.body : '\u2014') + '</td></tr>';
+          + '<td style="padding:7px 8px;text-align:center;font-weight:600;color:#3a3a3a">' + _val(c.h.acidity) + '</td>'
+          + '<td style="padding:7px 8px;text-align:center;font-weight:600;color:#3a3a3a">' + _val(c.h.sweetness) + '</td>'
+          + '<td style="padding:7px 8px;text-align:center;font-weight:600;color:#3a3a3a">' + _val(c.h.bitterness) + '</td>'
+          + '<td style="padding:7px 8px;text-align:center;font-weight:600;color:#3a3a3a">' + _val(c.h.body) + '</td></tr>';
       }
       if (hasCool) {
         h += '<tr' + (hasHot ? ' style="border-top:1px solid #F0EBE2"' : '') + '><td style="padding:7px 8px;font-weight:700;color:#4A90D9;font-size:11px;border-top:1px solid #EFE9DD">Cool</td>'
-          + '<td style="padding:7px 8px;text-align:center;font-weight:600;color:#3a3a3a;border-top:1px solid #EFE9DD">' + (c.co.acidity != null ? c.co.acidity : '\u2014') + '</td>'
-          + '<td style="padding:7px 8px;text-align:center;font-weight:600;color:#3a3a3a;border-top:1px solid #EFE9DD">' + (c.co.sweetness != null ? c.co.sweetness : '\u2014') + '</td>'
-          + '<td style="padding:7px 8px;text-align:center;font-weight:600;color:#3a3a3a;border-top:1px solid #EFE9DD">' + (c.co.bitterness != null ? c.co.bitterness : '\u2014') + '</td>'
-          + '<td style="padding:7px 8px;text-align:center;font-weight:600;color:#3a3a3a;border-top:1px solid #EFE9DD">' + (c.co.body != null ? c.co.body : '\u2014') + '</td></tr>';
+          + '<td style="padding:7px 8px;text-align:center;font-weight:600;color:#3a3a3a;border-top:1px solid #EFE9DD">' + _val(c.co.acidity) + '</td>'
+          + '<td style="padding:7px 8px;text-align:center;font-weight:600;color:#3a3a3a;border-top:1px solid #EFE9DD">' + _val(c.co.sweetness) + '</td>'
+          + '<td style="padding:7px 8px;text-align:center;font-weight:600;color:#3a3a3a;border-top:1px solid #EFE9DD">' + _val(c.co.bitterness) + '</td>'
+          + '<td style="padding:7px 8px;text-align:center;font-weight:600;color:#3a3a3a;border-top:1px solid #EFE9DD">' + _val(c.co.body) + '</td></tr>';
       }
       h += '</table>';
     }
