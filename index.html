@@ -2055,6 +2055,7 @@ function confirmCustomWater() {
    Save brew
 ────────────────────────────────────────────────────────────── */
 function saveBrew() {
+  if (_dialSession) { saveDialSession(); return; }
   const dose = parseFloat(document.getElementById('lDose').value)  || 0;
   const water = parseFloat(document.getElementById('lWater').value) || 0;
   const bev   = parseFloat(document.getElementById('lBev').value)   || 0;
@@ -2101,12 +2102,6 @@ function saveBrew() {
     },
   };
 
-  /* Tag with dial-in session metadata */
-  if (_dialSession && !editBrewId) {
-    brew.sessionId = _dialSession.id;
-    brew.sessionTitle = _dialSession.title;
-  }
-
   if (editBrewId) {
     const i = brews.findIndex(b => b.id === editBrewId);
     if (i >= 0) brews[i] = brew;
@@ -2116,40 +2111,6 @@ function saveBrew() {
   persist(K_BREWS, brews);
   clearDraft();
   const wasNew = !editBrewId;
-
-  /* Dial-in session: advance to next brew or finish */
-  if (_dialSession && wasNew) {
-    _dialSession.savedBrewIds.push(brew.id);
-    if (_dialSession.idx === 0) {
-      _dialSession.baseSnapshot = {
-        beanId: brew.beanId,
-        grinder: brew.grinder, brewer: brew.brewer, filter: brew.filter, waterType: brew.waterType,
-        grind: brew.grind, dose: brew.dose, water: brew.water,
-        temp: brew.temp, bloom: brew.bloom, totalTime: brew.totalTime,
-        recipeNotes: brew.recipeNotes,
-        customVars: (brew.customVars || []).map(function(r) { return Object.assign({}, r); })
-      };
-    }
-    if (_dialSession.idx + 1 < _dialSession.count) {
-      _dialSession.idx++;
-      _dialPrefillNext();
-      _renderDialBanner();
-      showToast('Brew ' + _dialSession.idx + ' saved · enter Brew ' + (_dialSession.idx + 1));
-      updateDataStatus();
-      autoSync();
-      return;
-    } else {
-      const total = _dialSession.savedBrewIds.length;
-      _dialSession = null;
-      _renderDialBanner();
-      resetLogForm();
-      showToast('Dial-in complete · ' + total + ' brews saved');
-      updateDataStatus();
-      autoSync();
-      return;
-    }
-  }
-
   editBrewId = brew.id;  // keep reference so next save updates this brew
   TAB_CFG.log.title = 'Edit Brew';
   document.getElementById('hTitle').textContent = 'Edit Brew';
@@ -2196,33 +2157,55 @@ function startNewBrew() {
 }
 
 /* ──────────────────────────────────────────────────────────────
-   Dial-In Session
+   Dial-In Session  (tabbed, autosaved)
+   _dialSession = {
+     id, title, count, variables: [keys],
+     activeIdx, brews: [{ name, beanId, …, touched }]
+   }
 ────────────────────────────────────────────────────────────── */
-let _dialSession = null;  /* { id, title, count, idx, baseSnapshot, savedBrewIds[] } */
+let _dialSession = null;
 let _dialListenerAttached = false;
+const DIAL_VAR_OPTIONS = [
+  { key: 'grind',     label: 'Grind' },
+  { key: 'dose',      label: 'Dose' },
+  { key: 'water',     label: 'Water' },
+  { key: 'temp',      label: 'Temp' },
+  { key: 'bloom',     label: 'Bloom' },
+  { key: 'totalTime', label: 'Time' },
+  { key: 'brewer',    label: 'Brewer' },
+  { key: 'filter',    label: 'Filter' },
+  { key: 'waterType', label: 'Water' }
+];
 
 function startDialInSession() {
   if (_dialSession) { showToast('Already in a session'); return; }
-  let pickedCount = null;
   const ov = document.createElement('div');
   ov.id = 'dialSetupOverlay';
-  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px';
-  ov.innerHTML = '<div style="background:var(--card);border-radius:14px;padding:22px;max-width:360px;width:100%;box-shadow:0 6px 24px rgba(0,0,0,.25);font-family:inherit">'
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px;overflow-y:auto';
+  const varHTML = DIAL_VAR_OPTIONS.map(function(v) {
+    return '<button type="button" data-vk="' + v.key + '" onclick="_dialToggleVar(this)" style="padding:7px 12px;border-radius:18px;border:1.5px solid var(--border);background:var(--card);font-size:12px;font-weight:600;cursor:pointer;color:var(--text2);font-family:inherit">' + v.label + '</button>';
+  }).join('');
+  ov.innerHTML = '<div style="background:var(--card);border-radius:14px;padding:22px;max-width:400px;width:100%;box-shadow:0 6px 24px rgba(0,0,0,.25);font-family:inherit;max-height:90vh;overflow-y:auto;box-sizing:border-box">'
     + '<div style="font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:1.4px;margin-bottom:6px">Dial-In Session</div>'
     + '<div style="font-size:18px;font-weight:700;color:var(--text);margin-bottom:16px">Set up your session</div>'
     + '<label style="display:block;font-size:11px;color:var(--text2);margin-bottom:6px;font-weight:700;text-transform:uppercase;letter-spacing:.6px">Title</label>'
     + '<input id="dialTitleInput" type="text" placeholder="e.g. Ethiopia grind dial" style="width:100%;padding:10px 12px;border-radius:8px;border:1.5px solid var(--border);font-size:14px;background:var(--card);color:var(--text);font-family:inherit;margin-bottom:16px;box-sizing:border-box">'
     + '<label style="display:block;font-size:11px;color:var(--text2);margin-bottom:6px;font-weight:700;text-transform:uppercase;letter-spacing:.6px">How many brews?</label>'
-    + '<div style="display:flex;gap:8px;margin-bottom:20px">'
-      + '<button id="dialCount2" onclick="_dialPickCount(2)" style="flex:1;padding:14px;border-radius:10px;border:2px solid var(--border);background:var(--card);font-size:18px;font-weight:700;cursor:pointer;color:var(--text);font-family:inherit">2</button>'
-      + '<button id="dialCount3" onclick="_dialPickCount(3)" style="flex:1;padding:14px;border-radius:10px;border:2px solid var(--border);background:var(--card);font-size:18px;font-weight:700;cursor:pointer;color:var(--text);font-family:inherit">3</button>'
+    + '<div style="display:flex;gap:8px;margin-bottom:18px">'
+      + '<button id="dialCount2" type="button" onclick="_dialPickCount(2)" style="flex:1;padding:14px;border-radius:10px;border:2px solid var(--border);background:var(--card);font-size:18px;font-weight:700;cursor:pointer;color:var(--text);font-family:inherit">2</button>'
+      + '<button id="dialCount3" type="button" onclick="_dialPickCount(3)" style="flex:1;padding:14px;border-radius:10px;border:2px solid var(--border);background:var(--card);font-size:18px;font-weight:700;cursor:pointer;color:var(--text);font-family:inherit">3</button>'
     + '</div>'
+    + '<label style="display:block;font-size:11px;color:var(--text2);margin-bottom:8px;font-weight:700;text-transform:uppercase;letter-spacing:.6px">Variables you\'re changing</label>'
+    + '<div style="font-size:11px;color:var(--text3);margin-bottom:8px;line-height:1.45">Optional — pinned to the top of the form so you don\'t have to scroll for them.</div>'
+    + '<div id="dialVarPicker" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:20px">' + varHTML + '</div>'
     + '<div style="display:flex;gap:8px">'
-      + '<button onclick="_dialCancelSetup()" style="flex:1;padding:12px;border-radius:10px;border:1.5px solid var(--border);background:none;color:var(--text2);cursor:pointer;font-family:inherit;font-weight:600">Cancel</button>'
-      + '<button id="dialStartBtn" onclick="_dialStart()" disabled style="flex:1;padding:12px;border-radius:10px;border:none;background:var(--accent);color:#fff;font-weight:700;cursor:pointer;font-family:inherit;opacity:.4">Start</button>'
+      + '<button type="button" onclick="_dialCancelSetup()" style="flex:1;padding:12px;border-radius:10px;border:1.5px solid var(--border);background:none;color:var(--text2);cursor:pointer;font-family:inherit;font-weight:600">Cancel</button>'
+      + '<button id="dialStartBtn" type="button" onclick="_dialStart()" disabled style="flex:1;padding:12px;border-radius:10px;border:none;background:var(--accent);color:#fff;font-weight:700;cursor:pointer;font-family:inherit;opacity:.4">Start</button>'
     + '</div>'
     + '</div>';
   document.body.appendChild(ov);
+  window._dialPendingCount = null;
+  window._dialPendingVars = [];
   setTimeout(function() { const ti = document.getElementById('dialTitleInput'); if (ti) ti.focus(); }, 50);
 }
 
@@ -2231,42 +2214,76 @@ function _dialPickCount(n) {
   ['dialCount2','dialCount3'].forEach(function(id) {
     const b = document.getElementById(id);
     if (!b) return;
-    if (id === 'dialCount' + n) {
-      b.style.borderColor = 'var(--accent)';
-      b.style.background = 'var(--accent)';
-      b.style.color = '#fff';
-    } else {
-      b.style.borderColor = 'var(--border)';
-      b.style.background = 'var(--card)';
-      b.style.color = 'var(--text)';
-    }
+    const isActive = id === 'dialCount' + n;
+    b.style.borderColor = isActive ? 'var(--accent)' : 'var(--border)';
+    b.style.background  = isActive ? 'var(--accent)' : 'var(--card)';
+    b.style.color       = isActive ? '#fff' : 'var(--text)';
   });
   const sb = document.getElementById('dialStartBtn');
   if (sb) { sb.disabled = false; sb.style.opacity = '1'; }
+}
+
+function _dialToggleVar(el) {
+  const k = el.dataset.vk;
+  const arr = window._dialPendingVars || [];
+  const i = arr.indexOf(k);
+  if (i >= 0) {
+    arr.splice(i, 1);
+    el.style.borderColor = 'var(--border)';
+    el.style.background  = 'var(--card)';
+    el.style.color       = 'var(--text2)';
+  } else {
+    arr.push(k);
+    el.style.borderColor = 'var(--accent)';
+    el.style.background  = 'var(--accent)';
+    el.style.color       = '#fff';
+  }
+  window._dialPendingVars = arr;
 }
 
 function _dialCancelSetup() {
   const ov = document.getElementById('dialSetupOverlay');
   if (ov) ov.remove();
   window._dialPendingCount = null;
+  window._dialPendingVars = null;
+}
+
+function _emptyDialSlot(idx) {
+  return {
+    name: idx === 0 ? 'Base' : ('Brew ' + (idx + 1)),
+    beanId: null, grinder: null, brewer: null, filter: null, waterType: null,
+    dose: 0, water: 0, beverageWeight: null, tds: null,
+    grind: '', temp: null, bloom: null, totalTime: '',
+    score: null, recipeNotes: '', notes: '', adjust: '',
+    aroma: { intensity: '', notes: '' },
+    hot:   { intensity: '', acidity: 5, sweetness: 5, bitterness: 5, notes: '' },
+    cool:  { intensity: '', acidity: 5, sweetness: 5, bitterness: 5, notes: '' },
+    customVars: [], daysOffRoast: null, frozen: false,
+    date: today(), touched: false
+  };
 }
 
 function _dialStart() {
   const title = (document.getElementById('dialTitleInput')?.value || '').trim();
   const count = window._dialPendingCount;
   if (!count) return;
+  const variables = (window._dialPendingVars || []).slice();
+  const slots = [];
+  for (let i = 0; i < count; i++) slots.push(_emptyDialSlot(i));
   _dialSession = {
     id: uid(),
     title: title || ('Dial-In ' + today()),
     count: count,
-    idx: 0,
-    baseSnapshot: null,
-    savedBrewIds: []
+    variables: variables,
+    activeIdx: 0,
+    brews: slots
   };
   _dialCancelSetup();
   startNewBrew();
+  _dialLoadBrew(0);
   _attachDialListener();
   _renderDialBanner();
+  _renderDialVarPanel();
   document.getElementById('dialEntryWrap').style.display = 'none';
 }
 
@@ -2274,8 +2291,17 @@ function _attachDialListener() {
   if (_dialListenerAttached) return;
   _dialListenerAttached = true;
   document.getElementById('page-log').addEventListener('input', function() {
-    if (_dialSession && _dialSession.idx > 0) _updateDialDiff();
+    if (!_dialSession) return;
+    _dialSnapshotForm();
+    _renderDialBanner();
+    _renderDialVarPanel();
   });
+}
+
+function _dialBaseHasMin() {
+  if (!_dialSession) return false;
+  const b = _dialSession.brews[0];
+  return !!(b && b.beanId && b.dose > 0 && b.water > 0 && b.grind);
 }
 
 function _renderDialBanner() {
@@ -2286,128 +2312,280 @@ function _renderDialBanner() {
     banner.innerHTML = '';
     const wrap = document.getElementById('dialEntryWrap');
     if (wrap) wrap.style.display = '';
+    const sb = document.querySelector('#page-log .btn-primary');
+    if (sb) sb.textContent = 'Save Brew';
+    _renderDialVarPanel();
     return;
   }
   banner.style.display = '';
   banner.style.cssText = 'display:block;margin:12px 16px 0;background:linear-gradient(135deg,var(--accent),#a04830);color:#fff;border-radius:12px;padding:14px 16px;box-shadow:0 2px 8px rgba(0,0,0,.12);font-family:inherit';
-  const idx1 = _dialSession.idx + 1;
+  const baselineMet = _dialBaseHasMin();
+
   let html = '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">'
     + '<div style="min-width:0;flex:1">'
-    + '<div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:1.3px;opacity:.85">Dial-In Session · Brew ' + idx1 + ' of ' + _dialSession.count + '</div>'
+    + '<div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:1.3px;opacity:.85">Dial-In Session</div>'
     + '<div style="font-size:15px;font-weight:700;margin-top:3px;word-break:break-word">' + esc(_dialSession.title) + '</div>'
     + '</div>'
     + '<button onclick="_dialEndConfirm()" style="flex-shrink:0;background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:8px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;letter-spacing:.4px;text-transform:uppercase">End</button>'
     + '</div>';
-  html += '<div id="dialDiffDiv" style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.22)"></div>';
-  banner.innerHTML = html;
-  if (_dialSession.idx > 0) _updateDialDiff();
-  else {
-    const dd = document.getElementById('dialDiffDiv');
-    if (dd) dd.innerHTML = '<div style="font-size:11px;opacity:.8;line-height:1.4">Save Brew 1 as the baseline. Brews 2' + (_dialSession.count > 2 ? '–' + _dialSession.count : '') + ' will pre-fill from it; just change what\'s different.</div>';
-  }
-}
 
-function _dialDiffsFromForm() {
-  if (!_dialSession || !_dialSession.baseSnapshot) return [];
-  const b = _dialSession.baseSnapshot;
-  const fields = [
-    { id: 'lGrind', key: 'grind', label: 'Grind' },
-    { id: 'lDose',  key: 'dose',  label: 'Dose',  unit: 'g' },
-    { id: 'lWater', key: 'water', label: 'Water', unit: 'g' },
-    { id: 'lTemp',  key: 'temp',  label: 'Temp',  unit: '°' },
-    { id: 'lBloom', key: 'bloom', label: 'Bloom', unit: 's' },
-    { id: 'lTime',  key: 'totalTime', label: 'Time' }
-  ];
-  const diffs = [];
-  fields.forEach(function(f) {
-    const el = document.getElementById(f.id);
-    if (!el) return;
-    const cur = (el.value || '').toString().trim();
-    const base = b[f.key] != null ? String(b[f.key]) : '';
-    if (cur !== base && (cur || base)) {
-      const u = f.unit || '';
-      diffs.push('<span style="white-space:nowrap"><b>' + f.label + ':</b> ' + (base || '—') + u + ' → ' + (cur || '—') + u + '</span>');
-    }
+  /* Brew tabs */
+  html += '<div style="display:flex;gap:6px;margin-top:12px;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch">';
+  _dialSession.brews.forEach(function(slot, i) {
+    const active = i === _dialSession.activeIdx;
+    const disabled = i > 0 && !baselineMet;
+    const bg = active ? '#fff' : (disabled ? 'rgba(255,255,255,.08)' : 'rgba(255,255,255,.18)');
+    const color = active ? 'var(--accent)' : (disabled ? 'rgba(255,255,255,.4)' : '#fff');
+    const cursor = disabled ? 'not-allowed' : 'pointer';
+    const handler = disabled ? '' : ' onclick="_dialSwitchTab(' + i + ')"';
+    const label = (slot.name || ('Brew ' + (i + 1)));
+    html += '<button type="button"' + handler + ' style="flex:1;min-width:80px;background:' + bg + ';color:' + color + ';border:none;border-radius:8px;padding:9px 10px;font-size:12px;font-weight:700;cursor:' + cursor + ';font-family:inherit;text-overflow:ellipsis;overflow:hidden;white-space:nowrap;letter-spacing:.2px">'
+      + esc(label) + '</button>';
   });
-  return diffs;
+  html += '</div>';
+
+  if (!baselineMet) {
+    html += '<div style="margin-top:10px;font-size:11px;opacity:.85;line-height:1.45">Set <b>bean, dose, water, grind</b> on Base to unlock the other brews.</div>';
+  } else if (_dialSession.variables && _dialSession.variables.length) {
+    const labels = _dialSession.variables.map(function(k) {
+      const m = DIAL_VAR_OPTIONS.find(function(v) { return v.key === k; });
+      return m ? m.label : k;
+    });
+    html += '<div style="margin-top:10px;font-size:11px;opacity:.9"><span style="font-weight:700;text-transform:uppercase;letter-spacing:.8px">Varying:</span> ' + esc(labels.join(' · ')) + '</div>';
+  }
+
+  banner.innerHTML = html;
+
+  /* Relabel save button */
+  const sb = document.querySelector('#page-log .btn-primary');
+  if (sb) sb.textContent = 'Save Session (' + _dialSession.count + ' brews)';
 }
 
-function _updateDialDiff() {
-  const dd = document.getElementById('dialDiffDiv');
-  if (!dd || !_dialSession) return;
-  const diffs = _dialDiffsFromForm();
-  if (diffs.length) {
-    dd.innerHTML = '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;opacity:.85;margin-bottom:5px">What\'s different from Brew 1</div>'
-      + '<div style="font-size:12px;line-height:1.7">' + diffs.join(' &nbsp;·&nbsp; ') + '</div>';
-  } else {
-    dd.innerHTML = '<div style="font-size:11px;opacity:.8;font-style:italic">No changes from Brew 1 yet — adjust a variable.</div>';
+/* Variable comparison panel — shown above the form, near the top */
+function _renderDialVarPanel() {
+  let panel = document.getElementById('dialVarPanel');
+  if (!_dialSession || !_dialSession.variables || !_dialSession.variables.length) {
+    if (panel) panel.remove();
+    return;
+  }
+  if (!panel) {
+    panel = document.createElement('div');
+    panel.id = 'dialVarPanel';
+    const banner = document.getElementById('dialBanner');
+    banner.parentNode.insertBefore(panel, banner.nextSibling);
+  }
+  panel.style.cssText = 'margin:10px 16px 0;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px 14px;font-family:inherit';
+
+  const fmt = function(slot, k) {
+    if (k === 'brewer' || k === 'filter' || k === 'waterType' || k === 'grinder') return slot[k] || '—';
+    const v = slot[k];
+    if (v == null || v === '') return '—';
+    const unit = ({ dose: 'g', water: 'g', temp: '°', bloom: 's' })[k] || '';
+    return v + unit;
+  };
+
+  let html = '<div style="font-size:9.5px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:8px">Varying variables</div>';
+  html += '<div style="display:grid;grid-template-columns:80px repeat(' + _dialSession.count + ', 1fr);gap:6px 8px;font-size:12px;align-items:center">';
+  /* header row */
+  html += '<div></div>';
+  _dialSession.brews.forEach(function(slot, i) {
+    const active = i === _dialSession.activeIdx;
+    html += '<div style="font-size:10px;font-weight:700;color:' + (active ? 'var(--accent)' : 'var(--text3)') + ';text-transform:uppercase;letter-spacing:.5px;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(slot.name || ('Brew ' + (i + 1))) + '</div>';
+  });
+  /* one row per varied variable */
+  _dialSession.variables.forEach(function(k) {
+    const m = DIAL_VAR_OPTIONS.find(function(v) { return v.key === k; });
+    const lab = m ? m.label : k;
+    html += '<div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.4px">' + lab + '</div>';
+    _dialSession.brews.forEach(function(slot, i) {
+      const active = i === _dialSession.activeIdx;
+      const baseVal = _dialSession.brews[0] ? fmt(_dialSession.brews[0], k) : '—';
+      const v = fmt(slot, k);
+      const diff = i > 0 && v !== baseVal && v !== '—';
+      html += '<div style="font-size:13px;font-weight:' + (diff ? '700' : '500') + ';color:' + (diff ? 'var(--accent)' : (active ? 'var(--text)' : 'var(--text2)')) + ';text-align:center;padding:6px 4px;background:' + (active ? 'rgba(200,85,58,0.06)' : 'transparent') + ';border-radius:6px">' + esc(String(v)) + '</div>';
+    });
+  });
+  html += '</div>';
+  panel.innerHTML = html;
+}
+
+function _dialSwitchTab(idx) {
+  if (!_dialSession) return;
+  if (idx === _dialSession.activeIdx) return;
+  if (idx > 0 && !_dialBaseHasMin()) {
+    showToast('Set bean, dose, water, grind on Base first');
+    return;
+  }
+  _dialSnapshotForm();
+  /* propagate base recipe to untouched siblings */
+  if (_dialSession.activeIdx === 0) _dialPropagateBase();
+  _dialSession.activeIdx = idx;
+  _dialLoadBrew(idx);
+  _renderDialBanner();
+  _renderDialVarPanel();
+  document.getElementById('content').scrollTo(0, 0);
+}
+
+function _dialPropagateBase() {
+  if (!_dialSession) return;
+  const base = _dialSession.brews[0];
+  if (!base) return;
+  for (let i = 1; i < _dialSession.brews.length; i++) {
+    const o = _dialSession.brews[i];
+    if (o.touched) continue;
+    o.beanId = base.beanId;
+    o.grinder = base.grinder; o.brewer = base.brewer; o.filter = base.filter; o.waterType = base.waterType;
+    o.dose = base.dose; o.water = base.water; o.grind = base.grind;
+    o.temp = base.temp; o.bloom = base.bloom; o.totalTime = base.totalTime;
+    o.recipeNotes = base.recipeNotes;
+    o.customVars = (base.customVars || []).map(function(r) { return Object.assign({}, r); });
   }
 }
 
-function _dialPrefillNext() {
-  const b = _dialSession.baseSnapshot;
-  if (!b) return;
-  editBrewId = null;
-  selBean    = b.beanId;
-  selGrinder = b.grinder;
-  selBrewer  = b.brewer;
-  selFilter  = b.filter;
-  selWater   = b.waterType || null;
+function _dialSnapshotForm() {
+  if (!_dialSession) return;
+  const slot = _dialSession.brews[_dialSession.activeIdx];
+  if (!slot) return;
+  const newName = v('lName');
+  if (newName) slot.name = newName;
+  slot.beanId = selBean;
+  slot.grinder = selGrinder; slot.brewer = selBrewer; slot.filter = selFilter; slot.waterType = selWater;
+  slot.dose  = parseFloat(document.getElementById('lDose').value)  || 0;
+  slot.water = parseFloat(document.getElementById('lWater').value) || 0;
+  slot.beverageWeight = parseFloat(document.getElementById('lBev').value) || null;
+  slot.tds   = parseFloat(document.getElementById('lTDS').value) || null;
+  slot.temp  = nv('lTemp');
+  slot.grind = v('lGrind');
+  slot.bloom = nv('lBloom');
+  slot.totalTime = v('lTime');
+  slot.score = nv('lScore');
+  slot.recipeNotes = v('lRecipeNotes');
+  slot.notes = v('lNotes');
+  slot.adjust = v('lAdjust');
+  slot.aroma = { intensity: intState.aroma || '', notes: v('aromaNotes') };
+  slot.hot   = { intensity: intState.hot || '', acidity: ss.hA, sweetness: ss.hS, bitterness: ss.hB, notes: v('hotNotes') };
+  slot.cool  = { intensity: intState.cool || '', acidity: ss.cA, sweetness: ss.cS, bitterness: ss.cB, notes: v('coolNotes') };
+  slot.customVars = cvRows.filter(function(r) { return r.k; }).map(function(r) { return Object.assign({}, r); });
+  slot.daysOffRoast = (typeof getDOR === 'function') ? getDOR() : null;
+  slot.frozen = brewFrozen;
+  slot.date = logDate;
+  if (_dialSession.activeIdx > 0) slot.touched = true;
+}
 
-  const bean = beans.find(function(x) { return x.id === b.beanId; });
+function _dialLoadBrew(idx) {
+  if (!_dialSession) return;
+  const slot = _dialSession.brews[idx];
+  if (!slot) return;
+  editBrewId = null;
+  selBean    = slot.beanId;
+  selGrinder = slot.grinder;
+  selBrewer  = slot.brewer;
+  selFilter  = slot.filter;
+  selWater   = slot.waterType || null;
+
+  const bean = beans.find(function(x) { return x.id === slot.beanId; });
   const bd = document.getElementById('beanDisplay');
   if (bd) { bd.textContent = bean ? bdn(bean) : 'Select bean'; bd.style.color = bean ? 'var(--text)' : 'var(--text3)'; }
-  setDisp('grinderDisplay', b.grinder, 'Select');
-  setDisp('brewerDisplay',  b.brewer,  'Select');
-  setDisp('filterDisplay',  b.filter,  'Select');
-  setDisp('waterDisplay',   selWater,  'Select');
+  setDisp('grinderDisplay', slot.grinder, 'Select');
+  setDisp('brewerDisplay',  slot.brewer,  'Select');
+  setDisp('filterDisplay',  slot.filter,  'Select');
+  setDisp('waterDisplay',   slot.waterType, 'Select');
 
-  setV('lGrind', b.grind);
-  setV('lDose',  b.dose);
-  setV('lWater', b.water);
-  setV('lTemp',  b.temp);
-  setV('lBloom', b.bloom);
-  setV('lTime',  b.totalTime);
-  setV('lRecipeNotes', b.recipeNotes || '');
+  setV('lName', slot.name || '');
+  setV('lGrind', slot.grind);
+  setV('lDose',  slot.dose);
+  setV('lWater', slot.water);
+  setV('lTemp',  slot.temp);
+  setV('lBloom', slot.bloom);
+  setV('lTime',  slot.totalTime);
+  setV('lBev',   slot.beverageWeight);
+  setV('lTDS',   slot.tds);
+  setV('lScore', slot.score);
+  setV('lRecipeNotes', slot.recipeNotes || '');
+  setV('lNotes', slot.notes || '');
+  setV('lAdjust', slot.adjust || '');
+  setV('aromaNotes', slot.aroma?.notes || '');
+  setV('hotNotes',   slot.hot?.notes   || '');
+  setV('coolNotes',  slot.cool?.notes  || '');
 
-  /* Per-brew fields stay blank */
-  setV('lName', '');
-  setV('lBev',  '');
-  setV('lTDS',  '');
-  setV('lScore', '');
-  setV('lNotes', '');
-  setV('lAdjust', '');
-  setV('aromaNotes', '');
-  setV('hotNotes',   '');
-  setV('coolNotes',  '');
-
-  intState = { aroma: '', hot: '', cool: '' };
-  ss = { hA:5, hS:5, hB:5, cA:5, cS:5, cB:5 };
+  intState = {
+    aroma: slot.aroma?.intensity || '',
+    hot:   slot.hot?.intensity   || '',
+    cool:  slot.cool?.intensity  || ''
+  };
+  ss = {
+    hA: slot.hot?.acidity ?? 5,  hS: slot.hot?.sweetness ?? 5,  hB: slot.hot?.bitterness ?? 5,
+    cA: slot.cool?.acidity ?? 5, cS: slot.cool?.sweetness ?? 5, cB: slot.cool?.bitterness ?? 5
+  };
   buildSegControls();
-  cvRows = (b.customVars || []).map(function(r) { return Object.assign({}, r); });
+  cvRows = (slot.customVars || []).map(function(r) { return Object.assign({}, r); });
   renderCV();
   recalcEY();
-  setLogDate(today());
-  brewFrozen = false; brewDOR = null;
-  document.getElementById('dorInput').value = '';
+  setLogDate(slot.date || today());
+  brewFrozen = !!slot.frozen;
+  brewDOR = slot.daysOffRoast || null;
+  document.getElementById('dorInput').value = (brewFrozen && brewDOR != null) ? brewDOR : '';
   updateDOR();
 
   TAB_CFG.log.title = 'New Brew';
   document.getElementById('hTitle').textContent = 'New Brew';
-  document.getElementById('content').scrollTo(0, 0);
 }
 
 function _dialEndConfirm() {
   if (!_dialSession) return;
-  const saved = _dialSession.savedBrewIds.length;
-  const msg = saved > 0
-    ? 'End the dial-in session? ' + saved + ' brew' + (saved !== 1 ? 's' : '') + ' already saved will stay in your log.'
-    : 'Cancel the dial-in session?';
-  if (confirm(msg)) {
-    _dialSession = null;
-    _renderDialBanner();
-    if (saved === 0) resetLogForm();
+  if (!confirm('End the dial-in session? Unsaved data will be lost.')) return;
+  _dialSession = null;
+  _renderDialBanner();
+  _renderDialVarPanel();
+  resetLogForm();
+}
+
+function saveDialSession() {
+  if (!_dialSession) return;
+  _dialSnapshotForm();
+  if (_dialSession.activeIdx === 0) _dialPropagateBase();
+  if (!_dialBaseHasMin()) {
+    showToast('Base needs bean, dose, water, grind');
+    return;
   }
+  const sid = _dialSession.id;
+  const stitle = _dialSession.title;
+  const newBrews = [];
+  _dialSession.brews.forEach(function(slot) {
+    if (!slot.beanId) return;
+    const dose = slot.dose || 0;
+    const tds  = slot.tds  || 0;
+    const bev  = slot.beverageWeight || 0;
+    const ey = (bev > 0 && tds > 0 && dose > 0) ? parseFloat(((bev * tds) / dose).toFixed(2)) : null;
+    newBrews.push({
+      id: uid(),
+      beanId: slot.beanId,
+      name: slot.name || '',
+      date: slot.date || today(),
+      grinder: slot.grinder, brewer: slot.brewer, filter: slot.filter, waterType: slot.waterType,
+      dose: slot.dose, water: slot.water,
+      temp: slot.temp, grind: slot.grind, bloom: slot.bloom, totalTime: slot.totalTime,
+      beverageWeight: slot.beverageWeight, tds: slot.tds, ey: ey,
+      recipeNotes: slot.recipeNotes, notes: slot.notes, adjust: slot.adjust,
+      score: slot.score, daysOffRoast: slot.daysOffRoast, frozen: slot.frozen,
+      customVars: slot.customVars || [],
+      aroma: slot.aroma, hot: slot.hot, cool: slot.cool,
+      sessionId: sid, sessionTitle: stitle
+    });
+  });
+  if (!newBrews.length) { showToast('No brews to save'); return; }
+  /* Keep them in the order Base → Brew 2 → Brew 3 at the top of the log */
+  for (let i = newBrews.length - 1; i >= 0; i--) brews.unshift(newBrews[i]);
+  persist(K_BREWS, brews);
+  clearDraft();
+  const total = newBrews.length;
+  _dialSession = null;
+  _renderDialBanner();
+  _renderDialVarPanel();
+  resetLogForm();
+  showToast('Dial-in saved · ' + total + ' brews');
+  updateDataStatus();
+  autoSync();
 }
 
 /* ──────────────────────────────────────────────────────────────
