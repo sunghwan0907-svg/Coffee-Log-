@@ -2349,6 +2349,11 @@ function _renderDialBanner() {
   });
   html += '</div>';
 
+  /* Copy-from-past-recipe shortcut */
+  html += '<div style="margin-top:8px"><button type="button" onclick="_dialPickPastRecipe()" style="display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:7px;padding:6px 10px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;letter-spacing:.2px">'
+    + '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>'
+    + 'Copy recipe from past brew</button></div>';
+
   if (!baselineMet) {
     html += '<div style="margin-top:10px;font-size:11px;opacity:.85;line-height:1.45">Set <b>bean, dose, water, grind</b> on Base to unlock the other brews.</div>';
   } else if (_dialSession.variables && _dialSession.variables.length) {
@@ -2543,6 +2548,85 @@ function _dialEndConfirm() {
   _renderDialBanner();
   _renderDialVarPanel();
   resetLogForm();
+}
+
+function _dialPickPastRecipe() {
+  if (!_dialSession) return;
+  const ov = document.createElement('div');
+  ov.id = 'dialPastOverlay';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:310;display:flex;align-items:flex-end;justify-content:center;font-family:inherit';
+
+  const sorted = brews.slice().sort(function(a, b) { return (b.date || '').localeCompare(a.date || ''); });
+
+  let listHTML = '';
+  if (!sorted.length) {
+    listHTML = '<div style="padding:36px 20px;text-align:center;color:var(--text3);font-size:14px">No saved brews yet</div>';
+  } else {
+    sorted.forEach(function(b) {
+      const bean = beans.find(function(x) { return x.id === b.beanId; });
+      const beanName = bean ? bdn(bean) : 'Unknown';
+      const dd = b.date ? b.date.split('-') : [];
+      const fmtD = dd.length === 3 ? (dd[2] + '/' + dd[1] + '/' + (dd[0] || '').slice(-2)) : '';
+      const bits = [];
+      if (b.dose)  bits.push(b.dose + 'g');
+      if (b.water) bits.push(b.water + 'g');
+      if (b.grind) bits.push(b.grind + ' grind');
+      if (b.temp)  bits.push(b.temp + '°');
+      const score = b.score != null
+        ? '<div style="background:var(--accent);color:#fff;padding:2px 8px;border-radius:8px;font-size:11px;font-weight:700;flex-shrink:0">' + b.score + '/10</div>'
+        : '';
+      listHTML += '<button type="button" onclick="_dialUseRecipe(\'' + b.id + '\')" style="display:flex;align-items:center;gap:10px;width:100%;padding:14px 16px;background:none;border:none;border-bottom:1px solid var(--sep);text-align:left;cursor:pointer;font-family:inherit;color:var(--text)">'
+        + '<div style="flex:1;min-width:0">'
+        + '<div style="font-size:14px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(beanName) + '</div>'
+        + '<div style="font-size:12px;color:var(--text3);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'
+          + (fmtD ? esc(fmtD) + (bits.length ? ' · ' : '') : '')
+          + esc(bits.join(' · ')) + '</div>'
+        + '</div>' + score
+        + '</button>';
+    });
+  }
+
+  ov.innerHTML = '<div style="background:var(--bg2);border-radius:14px 14px 0 0;width:100%;max-width:600px;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 -4px 20px rgba(0,0,0,.15)">'
+    + '<div style="padding:14px 16px;border-bottom:1px solid var(--sep);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-shrink:0">'
+      + '<div style="min-width:0">'
+        + '<div style="font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:1.2px">Copy Recipe Into ' + esc(_dialSession.brews[_dialSession.activeIdx].name || ('Brew ' + (_dialSession.activeIdx + 1))) + '</div>'
+        + '<div style="font-size:16px;font-weight:700;color:var(--text);margin-top:2px">Pick a past brew</div>'
+      + '</div>'
+      + '<button type="button" onclick="document.getElementById(\'dialPastOverlay\').remove()" style="background:var(--fill);color:var(--text2);border:none;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;flex-shrink:0">Cancel</button>'
+    + '</div>'
+    + '<div style="overflow-y:auto;flex:1">' + listHTML + '</div>'
+    + '</div>';
+  document.body.appendChild(ov);
+}
+
+function _dialUseRecipe(brewId) {
+  if (!_dialSession) return;
+  const b = brews.find(function(x) { return x.id === brewId; });
+  if (!b) return;
+  const slot = _dialSession.brews[_dialSession.activeIdx];
+  if (!slot) return;
+  /* Recipe-only fields — leave name/score/tds/bev/notes/sensory alone */
+  slot.beanId    = b.beanId;
+  slot.grinder   = b.grinder;
+  slot.brewer    = b.brewer;
+  slot.filter    = b.filter;
+  slot.waterType = b.waterType || null;
+  slot.dose      = b.dose || 0;
+  slot.water     = b.water || 0;
+  slot.temp      = b.temp;
+  slot.grind     = b.grind;
+  slot.bloom     = b.bloom;
+  slot.totalTime = b.totalTime;
+  slot.recipeNotes = b.recipeNotes || '';
+  slot.customVars = (b.customVars || []).map(function(r) { return Object.assign({}, r); });
+  if (_dialSession.activeIdx > 0) slot.touched = true;
+  _dialLoadBrew(_dialSession.activeIdx);
+  if (_dialSession.activeIdx === 0) _dialPropagateBase();
+  const ov = document.getElementById('dialPastOverlay');
+  if (ov) ov.remove();
+  _renderDialBanner();
+  _renderDialVarPanel();
+  showToast('Recipe copied from past brew');
 }
 
 function saveDialSession() {
