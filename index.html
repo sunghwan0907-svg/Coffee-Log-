@@ -5521,7 +5521,7 @@ function exportChartReport() {
     var cupData = cupSessions.map(function(s) {
       var beanMap2 = {}; beans.forEach(function(b) { beanMap2[b.id] = b; });
       return {
-        n: s.name || '', d: s.date || '',
+        n: s.name || '', d: s.date || '', gn: s.generalNotes || '',
         cups: (s.cups || []).map(function(c) {
           var bean = beanMap2[c.beanId];
           var bName = bean ? [bean.roaster, bean.farmName, bean.processing, bean.varietal].filter(Boolean).join(' \u00b7 ') : 'Unknown';
@@ -5529,27 +5529,80 @@ function exportChartReport() {
         })
       };
     });
+    /* The string below is JS source that will be embedded in the
+       downloaded HTML file and run in the recipient's browser.
+       Mirrors _rptShowCupSession's rendering (cream + gold) and adds
+       a Save image button + lazy-loaded html2canvas exporter. */
     return 'var cupData=' + JSON.stringify(cupData) + ';\n'
       + 'var _dlCupActive=null;\n'
       + 'function dlShowCup(idx){\n'
       + '  if(_dlCupActive!=null){var pb=document.getElementById("dlCupBtn"+_dlCupActive);if(pb){pb.style.background="#FAFAF8";pb.style.color="#555";pb.style.borderColor="#D5D0CA"}}\n'
       + '  _dlCupActive=idx;var ab=document.getElementById("dlCupBtn"+idx);if(ab){ab.style.background="#1B2A4A";ab.style.color="#fff";ab.style.borderColor="#1B2A4A"}\n'
       + '  var s=cupData[idx];var dd=s.d?s.d.split("-"):[];var fmtD=dd.length===3?dd[2]+"-"+dd[1]+"-"+dd[0]:s.d;\n'
-      + '  var h=\'<div style="font-size:12px;color:#888;margin-bottom:12px">\'+fmtD+" \\u00b7 "+s.cups.length+" cup"+(s.cups.length!==1?"s":"")+\'</div>\';\n'
+      + '  var sTitle=s.n||("Cupping \\u2014 "+fmtD);\n'
+      /* Save image button \u2014 OUTSIDE the capture area */
+      + '  var h=\'<div style="display:flex;justify-content:flex-end;margin-bottom:10px"><button id="dlCupExportBtn" onclick="dlExportCup(\'+idx+\')" style="display:inline-flex;align-items:center;gap:6px;background:#1B2A4A;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Save image</button></div>\';\n'
+      /* Capture area starts */
+      + '  h+=\'<div id="dlCupExportArea" style="background:#FFFCF7;border:1px solid #EFE6D2;border-radius:14px;padding:22px 22px 18px;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;color:#2c2c2c">\';\n'
+      /* Header */
+      + '  h+=\'<div style="border-left:4px solid #B8860B;padding:2px 0 2px 14px;margin-bottom:16px"><div style="font-size:10px;font-weight:700;color:#B8860B;text-transform:uppercase;letter-spacing:1.4px;margin-bottom:5px">Cupping Session</div><div style="font-size:21px;font-weight:700;color:#1B2A4A;line-height:1.25;margin-bottom:4px;word-break:break-word">\'+sTitle+\'</div><div style="font-size:12px;color:#8a7e6a;letter-spacing:.2px">\'+fmtD+" \\u00b7 "+s.cups.length+" cup"+(s.cups.length!==1?"s":"")+\'</div></div>\';\n'
+      /* General notes (top) */
+      + '  if(s.gn&&s.gn.toString().trim()){h+=\'<div style="margin-bottom:14px;background:#fff;border-left:4px solid #B8860B;border-radius:8px;padding:12px 14px;box-shadow:0 1px 2px rgba(0,0,0,.03)"><div style="font-size:9.5px;font-weight:700;color:#B8860B;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:6px">General Notes</div><div style="font-size:13px;line-height:1.55;color:#3a3a3a;white-space:pre-wrap;word-break:break-word">\'+s.gn+\'</div></div>\'}\n'
+      /* Cup cards */
       + '  s.cups.forEach(function(c,ci){\n'
-      + '    h+=\'<div style="background:#FAFAF8;border-radius:8px;padding:12px;margin-bottom:8px">\';\n'
-      + '    h+=\'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><div><span style="font-weight:700;color:#B8860B;margin-right:8px">\'+(ci+1)+\'</span><span style="font-weight:600;color:#2c2c2c">\'+c.bn+\'</span>\'+(c.nt?\'<span style="color:#888;margin-left:6px;font-size:13px">\'+c.nt+\'</span>\':"")+\'</div>\'+(c.fq!=null?\'<div style="font-size:18px;font-weight:700;color:#B8860B">\'+c.fq+\'<span style="font-size:11px;color:#888;font-weight:500">/10</span></div>\':"")+\'</div>\';\n'
-      + '    if(c.da||c.wa){h+=\'<div style="margin-bottom:6px">\';if(c.da)h+=\'<div style="font-size:12px"><span style="font-weight:600;color:#8B6F47;text-transform:uppercase;font-size:10px;letter-spacing:.5px">Dry: </span>\'+c.da+\'</div>\';if(c.wa)h+=\'<div style="font-size:12px"><span style="font-weight:600;color:#8B6F47;text-transform:uppercase;font-size:10px;letter-spacing:.5px">Wet: </span>\'+c.wa+\'</div>\';h+=\'</div>\'}\n'
+      + '    h+=\'<div style="background:#fff;border:1px solid #F0EBE2;border-radius:10px;padding:13px 14px;margin-bottom:10px">\';\n'
+      + '    h+=\'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px"><div style="display:flex;align-items:flex-start;gap:10px;flex:1;min-width:0"><div style="flex-shrink:0;width:24px;height:24px;border-radius:50%;background:#B8860B;color:#fff;font-weight:700;font-size:13px;display:inline-flex;align-items:center;justify-content:center;line-height:1">\'+(ci+1)+\'</div><div style="min-width:0;flex:1;padding-top:2px"><div style="font-weight:700;color:#1B2A4A;font-size:14px;line-height:1.3;word-break:break-word">\'+c.bn+\'</div>\'+(c.nt?\'<div style="font-size:12px;color:#8a7e6a;margin-top:2px;word-break:break-word">\'+c.nt+\'</div>\':"")+\'</div></div>\'+(c.fq!=null?\'<div style="flex-shrink:0;background:#FFFCF7;border:1.5px solid #B8860B;border-radius:10px;padding:4px 10px;text-align:center;min-width:48px"><div style="font-size:18px;font-weight:700;color:#B8860B;line-height:1">\'+c.fq+\'<span style="font-size:10px;color:#a08a5e;font-weight:500">/10</span></div><div style="font-size:8.5px;color:#a08a5e;text-transform:uppercase;letter-spacing:.6px;font-weight:700;margin-top:2px">FQ</div></div>\':"")+\'</div>\';\n'
+      /* Aroma */
+      + '    if(c.da||c.wa){h+=\'<div style="margin-bottom:8px;background:#FAF6EE;border-radius:6px;padding:7px 10px">\';if(c.da)h+=\'<div style="font-size:12px;line-height:1.5"><span style="display:inline-block;font-weight:700;color:#8B6F47;text-transform:uppercase;font-size:9.5px;letter-spacing:.6px;margin-right:6px;min-width:64px">Dry</span><span style="color:#3a3a3a">\'+c.da+\'</span></div>\';if(c.wa)h+=\'<div style="font-size:12px;line-height:1.5"><span style="display:inline-block;font-weight:700;color:#8B6F47;text-transform:uppercase;font-size:9.5px;letter-spacing:.6px;margin-right:6px;min-width:64px">Wet Aroma</span><span style="color:#3a3a3a">\'+c.wa+\'</span></div>\';h+=\'</div>\'}\n'
+      /* Hot/Cool table */
       + '    var hasH=c.h&&(c.h.acidity!=null||c.h.sweetness!=null||c.h.bitterness!=null||c.h.body!=null);\n'
       + '    var hasC=c.co&&(c.co.acidity!=null||c.co.sweetness!=null||c.co.bitterness!=null||c.co.body!=null);\n'
-      + '    if(hasH||hasC){h+=\'<table style="width:100%;font-size:12px;border-collapse:collapse;margin-bottom:6px"><tr style="text-align:left;border-bottom:1px solid #eee"><th style="padding:4px 6px;font-weight:600;color:#888;font-size:11px"></th><th style="padding:4px 6px;font-size:11px;color:#888">Acid</th><th style="padding:4px 6px;font-size:11px;color:#888">Sweet</th><th style="padding:4px 6px;font-size:11px;color:#888">Bitter</th><th style="padding:4px 6px;font-size:11px;color:#888">Body</th></tr>\';\n'
-      + '      if(hasH)h+=\'<tr><td style="padding:4px 6px;font-weight:600;color:#C1666B">Hot</td><td style="padding:4px 6px">\'+(c.h.acidity!=null?c.h.acidity:"\\u2014")+\'</td><td style="padding:4px 6px">\'+(c.h.sweetness!=null?c.h.sweetness:"\\u2014")+\'</td><td style="padding:4px 6px">\'+(c.h.bitterness!=null?c.h.bitterness:"\\u2014")+\'</td><td style="padding:4px 6px">\'+(c.h.body!=null?c.h.body:"\\u2014")+\'</td></tr>\';\n'
-      + '      if(hasC)h+=\'<tr><td style="padding:4px 6px;font-weight:600;color:#4A90D9">Cool</td><td style="padding:4px 6px">\'+(c.co.acidity!=null?c.co.acidity:"\\u2014")+\'</td><td style="padding:4px 6px">\'+(c.co.sweetness!=null?c.co.sweetness:"\\u2014")+\'</td><td style="padding:4px 6px">\'+(c.co.bitterness!=null?c.co.bitterness:"\\u2014")+\'</td><td style="padding:4px 6px">\'+(c.co.body!=null?c.co.body:"\\u2014")+\'</td></tr>\';\n'
+      + '    if(hasH||hasC){h+=\'<table style="width:100%;font-size:12px;border-collapse:separate;border-spacing:0;margin-bottom:8px;background:#FAFAF8;border-radius:6px;overflow:hidden"><tr style="background:#F0EBE2"><th style="padding:5px 8px;font-weight:700;color:#888;font-size:9.5px;text-transform:uppercase;letter-spacing:.6px;text-align:left"></th><th style="padding:5px 8px;font-size:9.5px;color:#888;text-transform:uppercase;letter-spacing:.6px;font-weight:700;text-align:center">Acid</th><th style="padding:5px 8px;font-size:9.5px;color:#888;text-transform:uppercase;letter-spacing:.6px;font-weight:700;text-align:center">Sweet</th><th style="padding:5px 8px;font-size:9.5px;color:#888;text-transform:uppercase;letter-spacing:.6px;font-weight:700;text-align:center">Bitter</th><th style="padding:5px 8px;font-size:9.5px;color:#888;text-transform:uppercase;letter-spacing:.6px;font-weight:700;text-align:center">Body</th></tr>\';\n'
+      + '      var _suf=\'<span style="font-size:9px;color:#b0a890;font-weight:500;margin-left:1px">/9</span>\';\n'
+      + '      var _val=function(v){return v!=null?(v+_suf):"\\u2014"};\n'
+      + '      if(hasH)h+=\'<tr><td style="padding:7px 8px;font-weight:700;color:#C1666B;font-size:11px">Hot</td><td style="padding:7px 8px;text-align:center;font-weight:600;color:#3a3a3a">\'+_val(c.h.acidity)+\'</td><td style="padding:7px 8px;text-align:center;font-weight:600;color:#3a3a3a">\'+_val(c.h.sweetness)+\'</td><td style="padding:7px 8px;text-align:center;font-weight:600;color:#3a3a3a">\'+_val(c.h.bitterness)+\'</td><td style="padding:7px 8px;text-align:center;font-weight:600;color:#3a3a3a">\'+_val(c.h.body)+\'</td></tr>\';\n'
+      + '      if(hasC)h+=\'<tr><td style="padding:7px 8px;font-weight:700;color:#4A90D9;font-size:11px;border-top:1px solid #EFE9DD">Cool</td><td style="padding:7px 8px;text-align:center;font-weight:600;color:#3a3a3a;border-top:1px solid #EFE9DD">\'+_val(c.co.acidity)+\'</td><td style="padding:7px 8px;text-align:center;font-weight:600;color:#3a3a3a;border-top:1px solid #EFE9DD">\'+_val(c.co.sweetness)+\'</td><td style="padding:7px 8px;text-align:center;font-weight:600;color:#3a3a3a;border-top:1px solid #EFE9DD">\'+_val(c.co.bitterness)+\'</td><td style="padding:7px 8px;text-align:center;font-weight:600;color:#3a3a3a;border-top:1px solid #EFE9DD">\'+_val(c.co.body)+\'</td></tr>\';\n'
       + '      h+=\'</table>\'}\n'
-      + '    if(c.lk||c.dl||c.ex){h+=\'<div style="font-size:12px;line-height:1.5">\';if(c.lk)h+=\'<div><span style="font-weight:600;color:#4A7C59">\\u2713 </span>\'+c.lk+\'</div>\';if(c.dl)h+=\'<div><span style="font-weight:600;color:#C1666B">\\u2717 </span>\'+c.dl+\'</div>\';if(c.ex)h+=\'<div style="color:#888">\'+c.ex+\'</div>\';h+=\'</div>\'}\n'
+      /* Likes / Dislikes / Extra */
+      + '    if(c.lk||c.dl||c.ex){h+=\'<div style="font-size:12px;line-height:1.55;background:#FAFAF8;border-radius:6px;padding:7px 10px">\';if(c.lk)h+=\'<div><span style="font-weight:700;color:#4A7C59;margin-right:6px">\\u2713</span><span style="color:#3a3a3a">\'+c.lk+\'</span></div>\';if(c.dl)h+=\'<div\'+(c.lk?\' style="margin-top:2px"\':"")+\'><span style="font-weight:700;color:#C1666B;margin-right:6px">\\u2717</span><span style="color:#3a3a3a">\'+c.dl+\'</span></div>\';if(c.ex)h+=\'<div style="color:#777;font-style:italic\'+(c.lk||c.dl?\';margin-top:3px\':"")+\'">\'+c.ex+\'</div>\';h+=\'</div>\'}\n'
       + '    h+=\'</div>\';\n'
       + '  });\n'
+      /* Footer + close capture area */
+      + '  h+=\'<div style="margin-top:16px;text-align:center;font-size:9px;color:#c8b896;letter-spacing:1.2px;text-transform:uppercase;font-weight:600">Coffee Log</div></div>\';\n'
       + '  document.getElementById("dlCupContent").innerHTML=h;\n'
+      + '}\n'
+      /* Save image function (mirrors _exportCupSession) */
+      + 'function dlExportCup(idx){\n'
+      + '  var s=cupData[idx];if(!s)return;\n'
+      + '  var dd=s.d?s.d.split("-"):[];var fmtD=dd.length===3?dd[2]+"-"+dd[1]+"-"+dd[0]:s.d;\n'
+      + '  var slug=(s.n||fmtD||"session").toString().replace(/[^a-z0-9]+/gi,"-").replace(/^-+|-+$/g,"").toLowerCase()||"session";\n'
+      + '  var fname="cupping-"+slug+".png";\n'
+      + '  function doCap(){\n'
+      + '    var area=document.getElementById("dlCupExportArea");if(!area)return;\n'
+      + '    var btn=document.getElementById("dlCupExportBtn");var orig=btn?btn.innerHTML:"";\n'
+      + '    if(btn){btn.disabled=true;btn.innerHTML="Saving\\u2026";btn.style.opacity=".6"}\n'
+      + '    var pad=document.createElement("div");\n'
+      + '    pad.style.cssText="position:fixed;left:-10000px;top:0;background:#fff;padding:24px;border-radius:12px;width:"+Math.max(area.offsetWidth,480)+"px;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;color:#2c2c2c";\n'
+      + '    pad.innerHTML=area.innerHTML;document.body.appendChild(pad);\n'
+      + '    html2canvas(pad,{backgroundColor:"#ffffff",scale:2,logging:false}).then(function(canvas){\n'
+      + '      document.body.removeChild(pad);\n'
+      + '      if(btn){btn.disabled=false;btn.innerHTML=orig;btn.style.opacity=""}\n'
+      + '      canvas.toBlob(function(blob){if(!blob)return;var url=URL.createObjectURL(blob);var a=document.createElement("a");a.href=url;a.download=fname;document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(function(){URL.revokeObjectURL(url)},1000)},"image/png");\n'
+      + '    }).catch(function(e){\n'
+      + '      if(pad.parentNode)document.body.removeChild(pad);\n'
+      + '      if(btn){btn.disabled=false;btn.innerHTML=orig;btn.style.opacity=""}\n'
+      + '      alert("Could not save image: "+(e&&e.message?e.message:e));\n'
+      + '    });\n'
+      + '  }\n'
+      + '  if(typeof html2canvas==="undefined"){\n'
+      + '    var btn=document.getElementById("dlCupExportBtn");\n'
+      + '    if(btn){btn._orig=btn.innerHTML;btn.disabled=true;btn.innerHTML="Loading\\u2026";btn.style.opacity=".6"}\n'
+      + '    var sc=document.createElement("script");\n'
+      + '    sc.src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js";\n'
+      + '    sc.onload=function(){if(btn&&btn._orig){btn.innerHTML=btn._orig;btn.disabled=false;btn.style.opacity=""}doCap()};\n'
+      + '    sc.onerror=function(){if(btn&&btn._orig){btn.innerHTML=btn._orig;btn.disabled=false;btn.style.opacity=""}alert("Could not load image library \\u2014 check your connection.")};\n'
+      + '    document.head.appendChild(sc);\n'
+      + '  }else{doCap()}\n'
       + '}\n'
       + '(function(){\n'
       + 'var el=document.getElementById("dlCupping");if(!cupData.length)return;\n'
