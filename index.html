@@ -1966,14 +1966,24 @@ function pickBean(id) {
   updateDOR();
 }
 
+function _fmtRoastDate(rd) {
+  if (!rd) return '';
+  const parts = String(rd).split('-');
+  if (parts.length !== 3) return '';
+  const d = parseInt(parts[2], 10);
+  const m = parseInt(parts[1], 10);
+  if (isNaN(d) || isNaN(m)) return '';
+  return d + '/' + m;
+}
 function bdn(b) {
-  return [b.roaster, b.farmName, b.processing, b.varietal].filter(Boolean).join(' · ');
+  const parts = [b.roaster, b.other, b.farmName, b.processing, b.varietal].filter(Boolean);
+  const rd = _fmtRoastDate(b.roastDate);
+  if (rd) parts.push(rd);
+  return parts.join(', ');
 }
 function bdnSub(b) {
-  const parts = [];
-  if (b.farm) parts.push(b.farm);
-  if (b.other) parts.push(b.other);
-  return parts.join(' · ');
+  /* 'other' is now in the main name (bdn) — sub line only carries the region */
+  return b.farm || '';
 }
 
 function beanAge(b, refDate) {
