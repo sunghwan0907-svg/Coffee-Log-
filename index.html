@@ -3870,7 +3870,8 @@ function renderCupHistory() {
   renderCupFilterBar();
   const el = document.getElementById('cupHistory');
   const q = ((document.getElementById('cupSearch') || {}).value || '').trim().toLowerCase();
-  let list = cupSessions;
+  /* Newest → oldest by date */
+  let list = cupSessions.slice().sort(function(a, b) { return (b.date || '').localeCompare(a.date || ''); });
   if (_cupFilter) {
     list = list.filter(function(s) { return (s.cups || []).some(function(c) { return c.beanId === _cupFilter; }); });
   }
