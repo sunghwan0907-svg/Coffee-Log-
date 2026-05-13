@@ -3342,7 +3342,7 @@ function cloneBrew(e, id) {
   setV('lScore', '');
   setV('lRecipeNotes', brew.recipeNotes);
   setV('lNotes', '');  // output — clear
-  setV('lAdjust', '');
+  setV('lAdjust', brew.adjust || '');  // carry "adjust next" notes into the new brew
   setV('aromaNotes', '');
   setV('hotNotes',   '');
   setV('coolNotes',  '');
