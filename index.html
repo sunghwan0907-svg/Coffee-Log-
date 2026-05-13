@@ -1979,7 +1979,7 @@ function bdn(b) {
   const parts = [b.roaster, b.other, b.farmName, b.processing, b.varietal].filter(Boolean);
   const rd = _fmtRoastDate(b.roastDate);
   if (rd) parts.push(rd);
-  return parts.join(', ');
+  return parts.join(' · ');
 }
 function bdnSub(b) {
   /* 'other' is now in the main name (bdn) — sub line only carries the region */
