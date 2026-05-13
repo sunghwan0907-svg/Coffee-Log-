@@ -5597,7 +5597,7 @@ function _buildReportData() {
     const dor = (bean && bean.roastDate && b.date) ? Math.max(0, Math.floor((new Date(b.date+'T12:00:00') - new Date(bean.roastDate+'T12:00:00')) / 86400000)) : null;
     if (!seen[b.beanId]) { seen[b.beanId] = true; beanOptions.push({ id: b.beanId, label: bLabel(b.beanId) }); }
     return {
-      bi: b.beanId, bl: bLabel(b.beanId), d: b.date||'', sc: b.score??null,
+      bi: b.beanId, d: b.date||'', sc: b.score??null,
       ey: b.ey??null, tds: b.tds??null, gr: parseFloat(b.grind)||null,
       gn: b.grinder||'', do: b.dose||null, w: b.water||null, bv: b.beverageWeight||null,
       tp: b.temp||null, bm: b.bloom||null, dr: dor,
@@ -5656,18 +5656,55 @@ async function _decompress(b64url) {
 }
 
 async function shareCoachReport() {
-  const data = _buildReportData();
-  if (!data) { showToast('No brews to share'); return; }
+  /* GitHub Pages rejects URLs above ~14KB. Stay safely under that. */
+  const SAFE_URL_LIMIT = 14000;
+  const fullData = _buildReportData();
+  if (!fullData) { showToast('No brews to share'); return; }
   try {
     showToast('Generating link...');
-    const json = JSON.stringify(data);
-    const encoded = await _compress(json);
     const base = location.href.split('#')[0].split('?')[0];
-    const link = base + '?r=' + encoded;
-    if (link.length > 100000) { showToast('Too much data \u2014 use Export instead'); return; }
-    navigator.clipboard.writeText(link).then(() => {
-      showToast('Link copied! (' + Math.round(link.length/1024) + 'KB)');
-    }).catch(() => {
+
+    /* Try progressively smaller subsets until URL fits.
+       Brews are oldest-first (sorted by date), so slice(-N) keeps the N most recent.
+       Cup sessions are newest-first (storage order), so slice(0, N) keeps the N most recent. */
+    let brewsN = fullData.b.length;
+    let cupsN  = fullData.c.length;
+    let link = '';
+
+    for (let attempt = 0; attempt < 14; attempt++) {
+      const subset = {
+        b: fullData.b.slice(-brewsN),
+        o: fullData.o,
+        c: fullData.c.slice(0, cupsN)
+      };
+      const json = JSON.stringify(subset);
+      const encoded = await _compress(json);
+      link = base + '?r=' + encoded;
+      if (link.length <= SAFE_URL_LIMIT) break;
+      /* Trim \u2014 bias toward dropping cup sessions first since cup notes are text-heavy */
+      if (cupsN > 3)        cupsN  = Math.max(3,  Math.floor(cupsN  * 0.6));
+      else if (brewsN > 25) brewsN = Math.max(25, Math.floor(brewsN * 0.6));
+      else { link = ''; break; }
+    }
+
+    if (!link) {
+      showToast('Too much data \u2014 use Export Charts (HTML) instead');
+      return;
+    }
+
+    const truncatedB = brewsN < fullData.b.length;
+    const truncatedC = cupsN  < fullData.c.length;
+    let msg = 'Link copied (' + Math.round(link.length/1024) + 'KB)';
+    if (truncatedB || truncatedC) {
+      const bits = [];
+      if (truncatedB) bits.push(brewsN + '/' + fullData.b.length + ' brews');
+      if (truncatedC) bits.push(cupsN  + '/' + fullData.c.length + ' cuppings');
+      msg = 'Copied \u00b7 ' + bits.join(', ') + ' (' + Math.round(link.length/1024) + 'KB)';
+    }
+
+    navigator.clipboard.writeText(link).then(function() {
+      showToast(msg);
+    }).catch(function() {
       prompt('Copy this link:', link);
     });
   } catch(e) { showToast('Failed: ' + e.message); }
