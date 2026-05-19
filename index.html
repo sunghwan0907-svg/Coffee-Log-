@@ -1401,6 +1401,9 @@ body {
     <div class="sheet-handle"></div>
     <div class="sheet-title">Select Coffee</div>
     <div class="sheet-search"><input class="sheet-search-input" id="bpSearch" type="search" placeholder="Search…" oninput="renderBPList()"></div>
+    <div style="padding:0 16px 8px;display:flex;justify-content:flex-end">
+      <button onclick="openBlendBuilder()" style="display:inline-flex;align-items:center;gap:5px;background:none;border:1.5px dashed var(--sep);color:var(--text2);border-radius:18px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">+ Create Blend</button>
+    </div>
     <div id="bpChips"></div>
     <div class="sheet-scroll" id="bpList"></div>
   </div>
@@ -1976,6 +1979,17 @@ function _fmtRoastDate(rd) {
   return d + '/' + m;
 }
 function bdn(b) {
+  if (b && b.kind === 'blend' && Array.isArray(b.components) && b.components.length) {
+    const head = b.name ? b.name : 'Blend';
+    const compParts = b.components.map(function(c) {
+      const cb = beans.find(function(x) { return x.id === c.beanId; });
+      const label = cb ? (cb.roaster || cb.farmName || cb.varietal || 'Coffee') : '?';
+      const farm = (cb && cb.farmName && cb.farmName !== label) ? (' ' + cb.farmName) : '';
+      return c.pct + '% ' + label + farm;
+    });
+    const rd = _fmtRoastDate(b.roastDate);
+    return head + ' · ' + compParts.join(' / ') + (rd ? ' · ' + rd : '');
+  }
   const parts = [b.roaster, b.other, b.farmName, b.processing, b.varietal].filter(Boolean);
   const rd = _fmtRoastDate(b.roastDate);
   if (rd) parts.push(rd);
@@ -1984,6 +1998,165 @@ function bdn(b) {
 function bdnSub(b) {
   /* 'other' is now in the main name (bdn) — sub line only carries the region */
   return b.farm || '';
+}
+
+/* ──────────────────────────────────────────────────────────────
+   Blend builder
+────────────────────────────────────────────────────────────── */
+let _blendEditId = null;
+let _blendDraft  = { name: '', roastDate: '', components: [] };
+
+function openBlendBuilder(editId) {
+  _blendEditId = editId || null;
+  if (editId) {
+    const b = beans.find(function(x) { return x.id === editId; });
+    if (b && b.kind === 'blend') {
+      _blendDraft = {
+        name: b.name || '',
+        roastDate: b.roastDate || '',
+        components: (b.components || []).map(function(c) { return { beanId: c.beanId, pct: c.pct }; })
+      };
+    } else {
+      _blendDraft = { name: '', roastDate: '', components: [] };
+    }
+  } else {
+    _blendDraft = { name: '', roastDate: '', components: [] };
+  }
+  _renderBlendBuilder();
+}
+
+function _renderBlendBuilder() {
+  const existing = document.getElementById('blendBuilderOverlay');
+  if (existing) existing.remove();
+
+  const singleBeans = beans.filter(function(b) { return b.kind !== 'blend' && b.id !== _blendEditId; });
+  const compHtml = _blendDraft.components.map(function(c, idx) {
+    const opts = '<option value="">— select coffee —</option>' + singleBeans.map(function(b) {
+      const sel = c.beanId === b.id ? ' selected' : '';
+      return '<option value="' + b.id + '"' + sel + '>' + esc(bdn(b)) + '</option>';
+    }).join('');
+    return '<div style="display:flex;gap:6px;margin-bottom:8px;align-items:center">'
+      + '<select onchange="_blendUpdateComponent(' + idx + ',\'beanId\',this.value)" style="flex:1;min-width:0;padding:9px 10px;border-radius:8px;border:1.5px solid var(--sep);background:var(--bg2);color:var(--text);font-family:inherit;font-size:13px">' + opts + '</select>'
+      + '<input type="number" min="0" max="100" step="1" value="' + (c.pct || '') + '" oninput="_blendUpdateComponent(' + idx + ',\'pct\',parseFloat(this.value)||0)" placeholder="%" style="width:60px;padding:9px;border-radius:8px;border:1.5px solid var(--sep);background:var(--bg2);color:var(--text);font-family:inherit;font-size:13px;text-align:center">'
+      + '<span style="font-size:13px;color:var(--text3);margin-left:-4px">%</span>'
+      + '<button onclick="_blendRemoveComponent(' + idx + ')" style="background:none;border:none;color:var(--text3);font-size:20px;cursor:pointer;padding:0 6px;line-height:1" title="Remove">×</button>'
+      + '</div>';
+  }).join('');
+
+  const total = _blendDraft.components.reduce(function(s, c) { return s + (parseFloat(c.pct) || 0); }, 0);
+  const totalOK = total === 100;
+  const totalColor = totalOK ? 'var(--green)' : 'var(--accent)';
+  const totalText = 'Total: ' + total + '%' + (totalOK ? ' ✓' : '');
+
+  const ov = document.createElement('div');
+  ov.id = 'blendBuilderOverlay';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:320;display:flex;align-items:flex-end;justify-content:center;font-family:inherit';
+  ov.innerHTML = '<div style="background:var(--bg2);border-radius:14px 14px 0 0;width:100%;max-width:520px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 -4px 20px rgba(0,0,0,.15)">'
+    + '<div style="padding:14px 16px;border-bottom:1px solid var(--sep);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">'
+      + '<div><div style="font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:1.2px">' + (_blendEditId ? 'Edit Blend' : 'New Blend') + '</div>'
+      + '<div style="font-size:16px;font-weight:700;color:var(--text);margin-top:2px">' + (_blendEditId ? 'Edit components' : 'Build a blend') + '</div></div>'
+      + '<button onclick="document.getElementById(\'blendBuilderOverlay\').remove()" style="background:var(--fill);color:var(--text2);border:none;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">Cancel</button>'
+    + '</div>'
+    + '<div style="overflow-y:auto;flex:1;padding:14px 16px">'
+      + '<label style="display:block;font-size:11px;color:var(--text2);margin-bottom:4px;font-weight:700;text-transform:uppercase;letter-spacing:.6px">Name <span style="font-weight:500;text-transform:none;letter-spacing:0;color:var(--text3)">(optional)</span></label>'
+      + '<input id="blendNameInput" type="text" value="' + esc(_blendDraft.name) + '" oninput="_blendDraft.name=this.value" placeholder="e.g. Morning Blend" style="width:100%;padding:10px 12px;border-radius:8px;border:1.5px solid var(--sep);font-size:14px;background:var(--bg2);color:var(--text);font-family:inherit;margin-bottom:12px;box-sizing:border-box">'
+      + '<label style="display:block;font-size:11px;color:var(--text2);margin-bottom:4px;font-weight:700;text-transform:uppercase;letter-spacing:.6px">Roast date <span style="font-weight:500;text-transform:none;letter-spacing:0;color:var(--text3)">(optional)</span></label>'
+      + '<input id="blendDateInput" type="date" value="' + esc(_blendDraft.roastDate) + '" oninput="_blendDraft.roastDate=this.value" style="width:100%;padding:10px 12px;border-radius:8px;border:1.5px solid var(--sep);font-size:14px;background:var(--bg2);color:var(--text);font-family:inherit;margin-bottom:14px;box-sizing:border-box">'
+      + '<label style="display:block;font-size:11px;color:var(--text2);margin-bottom:8px;font-weight:700;text-transform:uppercase;letter-spacing:.6px">Components <span style="font-weight:500;text-transform:none;letter-spacing:0;color:var(--text3)">(up to 4)</span></label>'
+      + '<div id="blendComponentsList">' + (compHtml || '<div style="font-size:13px;color:var(--text3);padding:8px 0">No components yet — tap "Add coffee" below.</div>') + '</div>'
+      + (_blendDraft.components.length < 4 ? '<button onclick="_blendAddComponent()" style="display:inline-flex;align-items:center;gap:5px;background:none;border:1.5px dashed var(--sep);color:var(--text2);border-radius:8px;padding:9px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;margin-top:4px">+ Add coffee</button>' : '')
+      + '<div id="blendTotalDisplay" style="margin-top:14px;padding:10px 12px;background:var(--fill);border-radius:8px;font-size:13px;font-weight:700;color:' + totalColor + '">' + totalText + '</div>'
+    + '</div>'
+    + '<div style="padding:14px 16px;border-top:1px solid var(--sep);display:flex;gap:8px;flex-shrink:0">'
+      + (_blendEditId ? '<button onclick="_blendDelete()" style="flex:1;padding:12px;border-radius:10px;border:1.5px solid var(--accent);background:none;color:var(--accent);font-weight:700;cursor:pointer;font-family:inherit">Delete</button>' : '')
+      + '<button onclick="_blendSave()" style="flex:2;padding:12px;border-radius:10px;border:none;background:var(--accent);color:#fff;font-weight:700;cursor:pointer;font-family:inherit">' + (_blendEditId ? 'Save Changes' : 'Create Blend') + '</button>'
+    + '</div>'
+    + '</div>';
+  document.body.appendChild(ov);
+}
+
+function _blendAddComponent() {
+  if (_blendDraft.components.length >= 4) return;
+  _blendDraft.components.push({ beanId: '', pct: 0 });
+  _renderBlendBuilder();
+}
+
+function _blendRemoveComponent(idx) {
+  _blendDraft.components.splice(idx, 1);
+  _renderBlendBuilder();
+}
+
+function _blendUpdateComponent(idx, key, val) {
+  if (!_blendDraft.components[idx]) return;
+  _blendDraft.components[idx][key] = val;
+  if (key === 'pct') {
+    const total = _blendDraft.components.reduce(function(s, c) { return s + (parseFloat(c.pct) || 0); }, 0);
+    const el = document.getElementById('blendTotalDisplay');
+    if (el) {
+      el.textContent = 'Total: ' + total + '%' + (total === 100 ? ' ✓' : '');
+      el.style.color = total === 100 ? 'var(--green)' : 'var(--accent)';
+    }
+  }
+}
+
+function _blendSave() {
+  const comps = _blendDraft.components.filter(function(c) { return c.beanId; });
+  if (comps.length < 2) { showToast('Pick at least 2 coffees'); return; }
+  const total = comps.reduce(function(s, c) { return s + (parseFloat(c.pct) || 0); }, 0);
+  if (total !== 100 && !confirm('Total is ' + total + '%, not 100%. Save anyway?')) return;
+
+  let newId;
+  if (_blendEditId) {
+    const i = beans.findIndex(function(x) { return x.id === _blendEditId; });
+    if (i >= 0) {
+      beans[i] = Object.assign({}, beans[i], {
+        kind: 'blend',
+        name: _blendDraft.name || '',
+        roastDate: _blendDraft.roastDate || '',
+        components: comps
+      });
+      newId = _blendEditId;
+    }
+  } else {
+    newId = uid();
+    beans.unshift({
+      id: newId,
+      kind: 'blend',
+      name: _blendDraft.name || '',
+      roastDate: _blendDraft.roastDate || '',
+      components: comps
+    });
+  }
+  persist(K_BEANS, beans);
+  const wasEdit = !!_blendEditId;
+  _blendEditId = null;
+  const ov = document.getElementById('blendBuilderOverlay');
+  if (ov) ov.remove();
+
+  /* Refresh affected views */
+  if (typeof renderBeans === 'function') renderBeans();
+  if (typeof renderBPList === 'function' && document.getElementById('sBeanPick')) renderBPList();
+  if (typeof renderCupping === 'function') renderCupping();
+
+  /* Auto-select if a bean picker is currently open (brew flow) */
+  if (!wasEdit && document.getElementById('sBeanPick') && document.getElementById('sBeanPick').classList.contains('open')) {
+    pickBean(newId);
+  }
+  showToast(wasEdit ? 'Blend updated' : 'Blend created');
+}
+
+function _blendDelete() {
+  if (!_blendEditId) return;
+  if (!confirm('Delete this blend? Any brews using it keep their reference but will show "Unknown".')) return;
+  beans = beans.filter(function(b) { return b.id !== _blendEditId; });
+  persist(K_BEANS, beans);
+  _blendEditId = null;
+  const ov = document.getElementById('blendBuilderOverlay');
+  if (ov) ov.remove();
+  if (typeof renderBeans === 'function') renderBeans();
+  if (typeof renderBPList === 'function') renderBPList();
+  if (typeof renderCupping === 'function') renderCupping();
+  showToast('Blend deleted');
 }
 
 function beanAge(b, refDate) {
@@ -2784,9 +2957,10 @@ function openAddBean() {
 }
 
 function editBeanOpen(id) {
-  editBeanId = id;
   const b = beans.find(x => x.id === id);
   if (!b) return;
+  if (b.kind === 'blend') { openBlendBuilder(id); return; }
+  editBeanId = id;
   document.getElementById('addBeanTitle').textContent = 'Edit Bean';
   document.getElementById('saveBeanBtn').textContent  = 'Save Changes';
   document.getElementById('bRoaster').value  = b.roaster    || '';
@@ -3377,13 +3551,14 @@ let cupSelectedBeans = new Set();
 
 function renderCupping() {
   const list = document.getElementById('cupBeanList');
+  const blendBtn = '<div style="padding:10px 16px 4px;display:flex;justify-content:flex-end"><button onclick="openBlendBuilder()" style="display:inline-flex;align-items:center;gap:5px;background:none;border:1.5px dashed var(--sep);color:var(--text2);border-radius:18px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">+ Create Blend</button></div>';
   if (!beans.length) {
-    list.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text3);font-size:14px">No beans added yet. Add beans in the Bean tab first.</div>';
+    list.innerHTML = blendBtn + '<div style="padding:16px;text-align:center;color:var(--text3);font-size:14px">No beans added yet. Add beans in the Bean tab or create a blend.</div>';
     document.getElementById('cupCupsSection').style.display = 'none';
     document.getElementById('startCupBtn').style.display = 'none';
     return;
   }
-  list.innerHTML = beans.map(function(b) {
+  list.innerHTML = blendBtn + beans.map(function(b) {
     const sel = cupSelectedBeans.has(b.id);
     return '<div onclick="toggleCupBean(\'' + b.id + '\')" style="padding:14px 16px;display:flex;align-items:center;gap:12px;cursor:pointer;border-bottom:1px solid var(--border)">'
       + '<div style="width:22px;height:22px;border-radius:6px;border:2px solid ' + (sel ? 'var(--c-cupping)' : 'var(--border)') + ';background:' + (sel ? 'var(--c-cupping)' : 'none') + ';display:flex;align-items:center;justify-content:center">'
