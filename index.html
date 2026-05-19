@@ -2062,9 +2062,9 @@ function _renderBlendBuilder() {
       + '<input id="blendNameInput" type="text" value="' + esc(_blendDraft.name) + '" oninput="_blendDraft.name=this.value" placeholder="e.g. Morning Blend" style="width:100%;padding:10px 12px;border-radius:8px;border:1.5px solid var(--sep);font-size:14px;background:var(--bg2);color:var(--text);font-family:inherit;margin-bottom:12px;box-sizing:border-box">'
       + '<label style="display:block;font-size:11px;color:var(--text2);margin-bottom:4px;font-weight:700;text-transform:uppercase;letter-spacing:.6px">Roast date <span style="font-weight:500;text-transform:none;letter-spacing:0;color:var(--text3)">(optional)</span></label>'
       + '<input id="blendDateInput" type="date" value="' + esc(_blendDraft.roastDate) + '" oninput="_blendDraft.roastDate=this.value" style="width:100%;padding:10px 12px;border-radius:8px;border:1.5px solid var(--sep);font-size:14px;background:var(--bg2);color:var(--text);font-family:inherit;margin-bottom:14px;box-sizing:border-box">'
-      + '<label style="display:block;font-size:11px;color:var(--text2);margin-bottom:8px;font-weight:700;text-transform:uppercase;letter-spacing:.6px">Components <span style="font-weight:500;text-transform:none;letter-spacing:0;color:var(--text3)">(up to 4)</span></label>'
+      + '<label style="display:block;font-size:11px;color:var(--text2);margin-bottom:8px;font-weight:700;text-transform:uppercase;letter-spacing:.6px">Components <span style="font-weight:500;text-transform:none;letter-spacing:0;color:var(--text3)">(2 coffees)</span></label>'
       + '<div id="blendComponentsList">' + (compHtml || '<div style="font-size:13px;color:var(--text3);padding:8px 0">No components yet — tap "Add coffee" below.</div>') + '</div>'
-      + (_blendDraft.components.length < 4 ? '<button onclick="_blendAddComponent()" style="display:inline-flex;align-items:center;gap:5px;background:none;border:1.5px dashed var(--sep);color:var(--text2);border-radius:8px;padding:9px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;margin-top:4px">+ Add coffee</button>' : '')
+      + (_blendDraft.components.length < 2 ? '<button onclick="_blendAddComponent()" style="display:inline-flex;align-items:center;gap:5px;background:none;border:1.5px dashed var(--sep);color:var(--text2);border-radius:8px;padding:9px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;margin-top:4px">+ Add coffee</button>' : '')
       + '<div id="blendTotalDisplay" style="margin-top:14px;padding:10px 12px;background:var(--fill);border-radius:8px;font-size:13px;font-weight:700;color:' + totalColor + '">' + totalText + '</div>'
     + '</div>'
     + '<div style="padding:14px 16px;border-top:1px solid var(--sep);display:flex;gap:8px;flex-shrink:0">'
@@ -2076,7 +2076,7 @@ function _renderBlendBuilder() {
 }
 
 function _blendAddComponent() {
-  if (_blendDraft.components.length >= 4) return;
+  if (_blendDraft.components.length >= 2) return;
   _blendDraft.components.push({ beanId: '', pct: 0 });
   _renderBlendBuilder();
 }
