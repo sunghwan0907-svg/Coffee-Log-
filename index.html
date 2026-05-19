@@ -5558,7 +5558,7 @@ function exportChartReport() {
 
   const beanMap = {};
   beans.forEach(b => beanMap[b.id] = b);
-  const bLabel = id => { const b = beanMap[id]; return b ? [b.roaster, b.farmName, b.processing, b.varietal].filter(Boolean).join(' \u00b7 ') : 'Unknown'; };
+  const bLabel = id => { const b = beanMap[id]; return b ? bdn(b) : 'Unknown'; };
 
   /* Build export data: each brew becomes a flat object */
   const intMap = { 'Low': 1, 'Med-Low': 2, 'Med': 3, 'Med-High': 4, 'High': 5 };
@@ -5710,7 +5710,7 @@ function exportChartReport() {
         n: s.name || '', d: s.date || '', gn: s.generalNotes || '',
         cups: (s.cups || []).map(function(c) {
           var bean = beanMap2[c.beanId];
-          var bName = bean ? [bean.roaster, bean.farmName, bean.processing, bean.varietal].filter(Boolean).join(' \u00b7 ') : 'Unknown';
+          var bName = bean ? bdn(bean) : 'Unknown';
           return { bn: bName, nt: c.note || '', fq: c.fq != null ? c.fq : null, da: c.dryAroma || '', wa: c.wetAroma || '', h: c.hot || null, co: c.cool || null, lk: c.like || '', dl: c.dislike || '', ex: c.extra || '' };
         })
       };
@@ -5826,7 +5826,7 @@ function _buildReportData() {
   if (!sorted.length) return null;
   const beanMap = {};
   beans.forEach(b => beanMap[b.id] = b);
-  const bLabel = id => { const b = beanMap[id]; return b ? [b.roaster, b.farmName, b.processing, b.varietal].filter(Boolean).join(' \u00b7 ') : 'Unknown'; };
+  const bLabel = id => { const b = beanMap[id]; return b ? bdn(b) : 'Unknown'; };
   const intMap = { 'Low': 1, 'Med-Low': 2, 'Med': 3, 'Med-High': 4, 'High': 5 };
   const intVal = s => intMap[s] || 0;
   const beanOptions = [];
@@ -5851,7 +5851,7 @@ function _buildReportData() {
       n: s.name || '', d: s.date || '', gn: s.generalNotes || '',
       cups: (s.cups || []).map(function(c) {
         const bean = beanMap[c.beanId];
-        const bName = bean ? [bean.roaster, bean.farmName, bean.processing, bean.varietal].filter(Boolean).join(' \u00b7 ') : 'Unknown';
+        const bName = bean ? bdn(bean) : 'Unknown';
         return {
           bn: bName, nt: c.note || '', fq: c.fq != null ? c.fq : null,
           da: c.dryAroma || '', wa: c.wetAroma || '',
